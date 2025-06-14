@@ -7,6 +7,9 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddControllers();
 
+// Add health checks
+builder.Services.AddHealthChecks();
+
 // Add MCP services with correct lifetimes
 builder.Services.AddSingleton<IMcpToolExecutor, BasicMcpToolExecutor>();
 builder.Services.AddSingleton<IMcpResourceProvider, BasicMcpResourceProvider>();
@@ -47,6 +50,14 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseAuthorization();
+
+// Map health check endpoints
+app.MapHealthChecks("/health");
+app.MapHealthChecks("/health/ready");
+
 app.MapControllers();
 
 app.Run();
+
+// Make the Program class accessible to tests
+public partial class Program { }

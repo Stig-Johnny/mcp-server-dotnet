@@ -1,0 +1,214 @@
+# Default values for mcp-server-dotnet.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+global:
+  registry: ghcr.io
+  repository: stig-johnny/mcp-server-dotnet
+  tag: "main"
+  pullPolicy: IfNotPresent
+
+# API Service Configuration
+api:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: "" # Will be set to global.registry/global.repository/mcp-server-api
+    tag: ""        # Will use global.tag if not set
+    pullPolicy: ""  # Will use global.pullPolicy if not set
+  
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 8080
+  
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+  
+  env:
+    - name: ASPNETCORE_ENVIRONMENT
+      value: "Production"
+    - name: ASPNETCORE_URLS
+      value: "http://+:8080"
+  
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 8080
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  
+  readinessProbe:
+    httpGet:
+      path: /health/ready
+      port: 8080
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+# BFF Service Configuration
+bff:
+  enabled: true
+  replicaCount: 2
+  image:
+    repository: "" # Will be set to global.registry/global.repository/mcp-server-bff
+    tag: ""        # Will use global.tag if not set
+    pullPolicy: ""  # Will use global.pullPolicy if not set
+  
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 8080
+  
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+  
+  env:
+    - name: ASPNETCORE_ENVIRONMENT
+      value: "Production"
+    - name: ASPNETCORE_URLS
+      value: "http://+:8080"
+  
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 8080
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  
+  readinessProbe:
+    httpGet:
+      path: /health/ready
+      port: 8080
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+# Host Service Configuration (Aspire)
+host:
+  enabled: false  # Usually not needed for production, but available if required
+  replicaCount: 1
+  image:
+    repository: "" # Will be set to global.registry/global.repository/mcp-server-host
+    tag: ""        # Will use global.tag if not set
+    pullPolicy: ""  # Will use global.pullPolicy if not set
+  
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 8080
+  
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+# Ingress Configuration
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  hosts:
+    - host: mcp-server.local
+      paths:
+        - path: /api
+          pathType: Prefix
+          backend:
+            service: api
+        - path: /
+          pathType: Prefix
+          backend:
+            service: bff
+  tls:
+    - secretName: mcp-server-tls
+      hosts:
+        - mcp-server.local
+
+# Service Account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# Pod Security Context
+podSecurityContext:
+  fsGroup: 2000
+  runAsNonRoot: true
+  runAsUser: 1000
+
+# Container Security Context
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+
+# Node Selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}
+
+# Autoscaling
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Network Policy
+networkPolicy:
+  enabled: false
+  ingress: []
+  egress: []
+
+# Monitoring
+monitoring:
+  enabled: false
+  serviceMonitor:
+    enabled: false
+    interval: 30s
+    path: /metrics
+    
+# ConfigMap and Secrets
+config:
+  # Additional environment variables
+  env: {}
+  
+secrets:
+  # Additional secrets
+  env: {}

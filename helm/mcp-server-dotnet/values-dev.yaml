@@ -1,0 +1,70 @@
+# Development Values for MCP Server .NET
+global:
+  registry: ghcr.io
+  repository: stig-johnny/mcp-server-dotnet
+  tag: "develop"
+  pullPolicy: Always
+
+api:
+  enabled: true
+  replicaCount: 1
+  
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  
+  env:
+    - name: ASPNETCORE_ENVIRONMENT
+      value: "Development"
+    - name: ASPNETCORE_URLS
+      value: "http://+:8080"
+
+bff:
+  enabled: true
+  replicaCount: 1
+  
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  
+  env:
+    - name: ASPNETCORE_ENVIRONMENT
+      value: "Development"
+    - name: ASPNETCORE_URLS
+      value: "http://+:8080"
+
+ingress:
+  enabled: true
+  className: "nginx"
+  hosts:
+    - host: mcp-server-dev.yourdomain.com
+      paths:
+        - path: /api
+          pathType: Prefix
+          backend:
+            service: api
+        - path: /
+          pathType: Prefix
+          backend:
+            service: bff
+  tls:
+    - secretName: mcp-server-dev-tls
+      hosts:
+        - mcp-server-dev.yourdomain.com
+
+autoscaling:
+  enabled: false
+
+podDisruptionBudget:
+  enabled: false
+
+monitoring:
+  enabled: false

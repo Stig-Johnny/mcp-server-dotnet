@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "mcp-server-dotnet.fullname" . }}-config
+  labels:
+    {{- include "mcp-server-dotnet.labels" . | nindent 4 }}
+data:
+  # Application configuration
+  ASPNETCORE_ENVIRONMENT: "Production"
+  {{- range $key, $value := .Values.config.env }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
