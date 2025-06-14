@@ -56,31 +56,57 @@ kubectl create secret docker-registry ghcr-secret \
 
 ## ArgoCD Application Architecture
 
-The MCP Gateway deployment uses a multi-application ArgoCD architecture designed for scalability and maintainability:
+The MCP Server .NET deployment uses an **App-of-Apps** pattern with ArgoCD for streamlined multi-environment management:
 
-### Application Structure
+### App-of-Apps Structure
 
 ```
-ArgoCD Applications
-├── mcp-gateway (Gateway-only deployment)
-│   ├── Namespace: mcp-gateway
-│   ├── Helm Chart: helm/mcp-server-dotnet
-│   ├── Values: values-gateway.yaml
-│   └── Image Updater: Enabled
-└── mcp-server-dotnet (Full application deployment)
-    ├── Namespace: mcp-server
-    ├── Helm Chart: helm/mcp-server-dotnet
-    ├── Values: values.yaml
-    └── Multi-service Image Updater: Enabled
+ArgoCD App-of-Apps Architecture
+├── mcp-server-dotnet-apps (Root Application - App-of-Apps)
+│   ├── Manages: All child applications via GitOps
+│   ├── Source: argocd/applications directory
+│   └── Deployment: Single kubectl apply
+│
+├── Production Environment
+│   ├── mcp-server-dotnet (Full application)
+│   │   ├── Namespace: mcp-server
+│   │   ├── Values: values.yaml
+│   │   └── Multi-service Image Updater: Enabled
+│   └── mcp-gateway (Gateway-only)
+│       ├── Namespace: mcp-gateway
+│       ├── Values: values-gateway.yaml
+│       └── Image Updater: Enabled
+│
+├── Staging Environment
+│   ├── mcp-server-dotnet-staging (Full application)
+│   │   ├── Namespace: mcp-server-staging
+│   │   ├── Values: values.yaml + values-staging.yaml
+│   │   └── Multi-service Image Updater: Enabled
+│   └── mcp-gateway-staging (Gateway-only)
+│       ├── Namespace: mcp-gateway-staging
+│       ├── Values: values-gateway.yaml + values-staging.yaml
+│       └── Image Updater: Enabled
+│
+└── Development Environment
+    ├── mcp-server-dotnet-dev (Full application)
+    │   ├── Namespace: mcp-server-dev
+    │   ├── Values: values.yaml + values-dev.yaml
+    │   └── Multi-service Image Updater: Enabled
+    └── mcp-gateway-dev (Gateway-only)
+        ├── Namespace: mcp-gateway-dev
+        ├── Values: values-gateway.yaml + values-dev.yaml
+        └── Image Updater: Enabled
 ```
 
 ### Key Design Principles
 
-1. **Separation of Concerns**: Gateway deployment separate from full application
-2. **Automated Updates**: Image Updater integration for zero-touch deployments
-3. **Environment Isolation**: Different namespaces for different services
-4. **GitOps Workflow**: All changes tracked through Git commits
-5. **High Availability**: Built-in retry logic and self-healing capabilities
+1. **App-of-Apps Pattern**: Single root application manages all environments and services
+2. **Simplified Deployment**: Only one kubectl apply needed for all applications
+3. **Environment Isolation**: Separate namespaces for dev, staging, and production
+4. **Automated Updates**: Image Updater integration for zero-touch deployments
+5. **GitOps Workflow**: All changes tracked through Git commits
+6. **High Availability**: Built-in retry logic and self-healing capabilities
+7. **Centralized Management**: All applications managed through single GitOps repository
 
 ## Creating Application Manifests
 
@@ -465,7 +491,48 @@ regexp:^(main|v.*)$
 
 ## Deployment Procedures
 
-### 1. Initial Deployment
+### 1. App-of-Apps Deployment (Recommended)
+
+The app-of-apps pattern simplifies deployment by managing all applications through a single root application.
+
+#### One-Command Deployment
+
+```bash
+# Deploy all applications using app-of-apps pattern
+kubectl apply -f argocd/app-of-apps.yaml
+
+# Verify root application creation
+kubectl get applications -n argocd mcp-server-dotnet-apps
+
+# Wait for all child applications to be created (may take 1-2 minutes)
+kubectl get applications -n argocd
+```
+
+**Expected Output:**
+```
+NAME                         SYNC STATUS   HEALTH STATUS   REPO                                              PATH                    TARGET
+mcp-server-dotnet-apps       Synced        Healthy         https://github.com/Stig-Johnny/mcp-server-dotnet argocd/applications    main
+mcp-server-dotnet            Synced        Healthy         https://github.com/Stig-Johnny/mcp-server-dotnet helm/mcp-server-dotnet main
+mcp-server-dotnet-dev        Synced        Healthy         https://github.com/Stig-Johnny/mcp-server-dotnet helm/mcp-server-dotnet main
+mcp-server-dotnet-staging    Synced        Healthy         https://github.com/Stig-Johnny/mcp-server-dotnet helm/mcp-server-dotnet main
+mcp-gateway                  Synced        Healthy         https://github.com/Stig-Johnny/mcp-server-dotnet helm/mcp-server-dotnet main
+mcp-gateway-dev              Synced        Healthy         https://github.com/Stig-Johnny/mcp-server-dotnet helm/mcp-server-dotnet main
+mcp-gateway-staging          Synced        Healthy         https://github.com/Stig-Johnny/mcp-server-dotnet helm/mcp-server-dotnet main
+```
+
+#### AppProject Deployment (Optional)
+
+```bash
+# Deploy AppProject for enhanced security (optional but recommended)
+kubectl apply -f argocd/appproject.yaml
+
+# Verify AppProject creation
+kubectl get appprojects -n argocd
+```
+
+### 2. Manual Deployment (Legacy Method)
+
+If you prefer to deploy applications individually, you can still use the manual approach:
 
 #### Step 1: Deploy AppProject (Optional)
 
@@ -477,27 +544,17 @@ kubectl apply -f argocd/appproject.yaml
 kubectl get appprojects -n argocd
 ```
 
-#### Step 2: Deploy MCP Gateway
+#### Step 2: Deploy Individual Applications
 
 ```bash
-# Deploy the dedicated Gateway application
-kubectl apply -f argocd/application-gateway.yaml
+# Deploy all applications manually
+kubectl apply -f argocd/applications/
 
-# Verify application creation
+# Verify all applications are created
 kubectl get applications -n argocd
 ```
 
-#### Step 3: Deploy Full Application (Optional)
-
-```bash
-# Deploy the full application stack
-kubectl apply -f argocd/application.yaml
-
-# List all applications
-kubectl get applications -n argocd
-```
-
-### 2. Validation Deployment
+### 3. Validation Deployment
 
 Before production deployment, validate your configuration:
 
@@ -513,106 +570,38 @@ Before production deployment, validate your configuration:
 - ✅ Helm charts are valid and render correctly
 - ✅ ArgoCD configurations include image updater
 - ✅ GitHub Actions workflow includes gateway build
+- ✅ App-of-Apps pattern validation
+- ✅ All environment applications are created
 
-### 3. Environment-Specific Deployments
+### 4. Deployment Verification
 
-#### Development Environment
+#### Check All Applications Status
 
 ```bash
-# Deploy to development with main tag
-kubectl apply -f - <<EOF
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: mcp-gateway-dev
-  namespace: argocd
-spec:
-  project: default
-  source:
-    repoURL: https://github.com/Stig-Johnny/mcp-server-dotnet.git
-    targetRevision: main
-    path: helm/mcp-server-dotnet
-    helm:
-      valueFiles:
-        - values-gateway.yaml
-        - values-dev.yaml
-      parameters:
-        - name: global.tag
-          value: main
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: mcp-gateway-dev
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-EOF
+# List all applications managed by app-of-apps
+kubectl get applications -n argocd
+
+# Check root application status
+kubectl describe application mcp-server-dotnet-apps -n argocd
+
+# Verify all child applications are healthy
+kubectl get applications -n argocd -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.sync.status}{"\t"}{.status.health.status}{"\n"}{end}'
 ```
 
-#### Staging Environment
+#### Environment-Specific Verification
 
 ```bash
-# Deploy to staging with main tag (GitOps promotion step)
-kubectl apply -f - <<EOF
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: mcp-gateway-staging
-  namespace: argocd
-spec:
-  project: default
-  source:
-    repoURL: https://github.com/Stig-Johnny/mcp-server-dotnet.git
-    targetRevision: main
-    path: helm/mcp-server-dotnet
-    helm:
-      valueFiles:
-        - values-gateway.yaml
-        - values-staging.yaml
-      parameters:
-        - name: global.tag
-          value: main
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: mcp-gateway-staging
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-EOF
-```
+# Check development environment
+kubectl get pods -n mcp-server-dev
+kubectl get pods -n mcp-gateway-dev
 
-#### Production Environment
+# Check staging environment  
+kubectl get pods -n mcp-server-staging
+kubectl get pods -n mcp-gateway-staging
 
-```bash
-# Deploy to production with version tag (final GitOps promotion step)
-kubectl apply -f - <<EOF
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: mcp-gateway-prod
-  namespace: argocd
-spec:
-  project: mcp-server
-  source:
-    repoURL: https://github.com/Stig-Johnny/mcp-server-dotnet.git
-    targetRevision: main
-    path: helm/mcp-server-dotnet
-    helm:
-      valueFiles:
-        - values-gateway.yaml
-        - values-prod.yaml
-      parameters:
-        - name: global.tag
-          value: v1.0.0
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: mcp-gateway
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-EOF
+# Check production environment
+kubectl get pods -n mcp-server
+kubectl get pods -n mcp-gateway
 ```
 
 ## Application Status Verification
@@ -904,14 +893,22 @@ kubectl logs -n argocd -l app.kubernetes.io/name=argocd-repo-server
 
 ## Best Practices
 
-### 1. Application Organization
+### 1. App-of-Apps Pattern
+
+- **Use app-of-apps for multi-environment deployments** to simplify management
+- **Single root application** eliminates need to manually manage multiple applications
+- **Organize applications in directories** for better structure and maintainability
+- **Version control all application manifests** for complete GitOps workflow
+- **Use sync waves** for controlling deployment order when needed
+
+### 2. Application Organization
 
 - **Use separate applications** for different environments (dev, staging, prod)
 - **Implement AppProjects** for multi-tenant scenarios
 - **Use meaningful labels** for application categorization
 - **Document application purpose** in annotations
 
-### 2. Sync Policy Configuration
+### 3. Sync Policy Configuration
 
 - **Enable pruning** for clean deployments
 - **Use self-heal cautiously** in production

@@ -68,7 +68,26 @@ fi
 
 # Test 7: Validate ArgoCD Configuration
 echo -e "${BLUE}🔄 Validating ArgoCD configurations...${NC}"
-for app in argocd/application-gateway.yaml argocd/application.yaml argocd/application-gateway-dev.yaml argocd/application-dev.yaml argocd/application-gateway-staging.yaml argocd/application-staging.yaml; do
+
+# Check for app-of-apps root application
+if [ -f "argocd/app-of-apps.yaml" ]; then
+    echo -e "${GREEN}✅ Found ArgoCD app-of-apps root application${NC}"
+else
+    echo -e "${RED}❌ Missing ArgoCD app-of-apps root application${NC}"
+    exit 1
+fi
+
+# Check applications directory structure
+if [ -d "argocd/applications" ]; then
+    echo -e "${GREEN}✅ Found ArgoCD applications directory${NC}"
+    app_count=$(find argocd/applications -name "*.yaml" -type f | wc -l)
+    echo -e "${GREEN}✅ Found $app_count application manifests in directory${NC}"
+else
+    echo -e "${RED}❌ Missing ArgoCD applications directory${NC}"
+    exit 1
+fi
+
+for app in argocd/applications/application-gateway.yaml argocd/applications/application.yaml argocd/applications/application-gateway-dev.yaml argocd/applications/application-dev.yaml argocd/applications/application-gateway-staging.yaml argocd/applications/application-staging.yaml; do
     if [ -f "$app" ]; then
         echo -e "${GREEN}✅ Found $app${NC}"
         # Check for SHA-based image tagging in image updater annotations
@@ -140,6 +159,7 @@ echo "✅ MCP Protocol compliance tests pass"
 echo "✅ Docker container builds successfully"
 echo "✅ Helm charts are valid and render correctly"
 echo "✅ ArgoCD configurations include image updater"
+echo "✅ ArgoCD app-of-apps pattern configured correctly"
 echo "✅ ArgoCD finalizers follow Kubernetes best practices"
 echo "✅ GitHub Actions workflow includes gateway build"
 echo "✅ Staging and production deployment workflows configured"
@@ -147,11 +167,11 @@ echo "✅ Staging and production deployment workflows configured"
 echo -e "\n${YELLOW}🚀 Ready for deployment!${NC}"
 echo -e "${BLUE}Next steps:${NC}"
 echo "1. Push changes to trigger GitHub Actions build"
-echo "2. Deploy to staging: kubectl apply -f argocd/application-staging.yaml -f argocd/application-gateway-staging.yaml"
-echo "3. Deploy to prod: kubectl apply -f argocd/application.yaml -f argocd/application-gateway.yaml"
+echo "2. Deploy app-of-apps: kubectl apply -f argocd/app-of-apps.yaml"
+echo "3. Verify all applications: kubectl get applications -n argocd"
 echo "4. Monitor staging deployment: kubectl get pods -n mcp-server-staging -n mcp-gateway-staging"
 echo "5. Monitor prod deployment: kubectl get pods -n mcp-server -n mcp-gateway"
-echo "6. Check health: kubectl port-forward svc/mcp-gateway-service 8080:80 -n mcp-gateway-dev"
+echo "6. Check health: kubectl port-forward svc/mcp-gateway-service 8080:80 -n mcp-gateway"
 
 # Cleanup
 rm -f /tmp/helm-test-output.yaml
