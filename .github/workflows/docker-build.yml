@@ -26,31 +26,13 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    # Pre-restore packages on the runner to cache them
+    # Setup .NET SDK
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: '8.0.x'
 
-    - name: Cache NuGet packages
-      uses: actions/cache@v4
-      with:
-        path: ~/.nuget/packages
-        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
-        restore-keys: |
-          ${{ runner.os }}-nuget-
-
-    - name: Cache npm packages
-      uses: actions/cache@v4
-      with:
-        path: src/Presentation/McpServer.Bff/frontend/node_modules
-        key: ${{ runner.os }}-npm-${{ hashFiles('src/Presentation/McpServer.Bff/frontend/package-lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-npm-
-
-    - name: Pre-restore .NET packages
-      run: dotnet restore --verbosity normal
-
+    # Setup Node.js
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
@@ -58,27 +40,38 @@ jobs:
         cache: 'npm'
         cache-dependency-path: src/Presentation/McpServer.Bff/frontend/package-lock.json
 
-    - name: Pre-install npm packages
+    # Restore .NET packages
+    - name: Restore .NET packages
+      run: dotnet restore --verbosity normal
+
+    # Install npm packages
+    - name: Install npm packages
       run: |
         cd src/Presentation/McpServer.Bff/frontend
         npm ci --production=false
 
-    - name: Build .NET applications on runner
-      run: |
-        dotnet publish src/Presentation/McpServer.Api/McpServer.Api.csproj -c Release -o ./publish/api --self-contained false
-        dotnet publish src/Presentation/McpServer.Bff/McpServer.Bff.csproj -c Release -o ./publish/bff --self-contained false
-
+    # Build React frontend
     - name: Build React frontend
       run: |
         cd src/Presentation/McpServer.Bff/frontend
         npm run build
 
+    # Create publish directories
+    - name: Create publish directories
+      run: mkdir -p publish/api publish/bff
+
+    # Build and publish .NET applications
+    - name: Publish API
+      run: dotnet publish src/Presentation/McpServer.Api/McpServer.Api.csproj -c Release -o ./publish/api --self-contained false
+
+    - name: Publish BFF
+      run: dotnet publish src/Presentation/McpServer.Bff/McpServer.Bff.csproj -c Release -o ./publish/bff --self-contained false
+
+    # Setup Docker Buildx
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
-      with:
-        driver-opts: |
-          network=host
 
+    # Login to container registry
     - name: Log in to Container Registry
       if: github.event_name != 'pull_request'
       uses: docker/login-action@v3
@@ -87,6 +80,7 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
+    # Extract metadata for API
     - name: Extract metadata for API
       id: meta-api
       uses: docker/metadata-action@v5
@@ -101,6 +95,7 @@ jobs:
         flavor: |
           latest=auto
 
+    # Extract metadata for BFF
     - name: Extract metadata for BFF
       id: meta-bff
       uses: docker/metadata-action@v5
@@ -115,6 +110,7 @@ jobs:
         flavor: |
           latest=auto
 
+    # Build and push API Docker image
     - name: Build and push API Docker image
       uses: docker/build-push-action@v5
       with:
@@ -126,9 +122,8 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
         platforms: linux/amd64
-        build-args: |
-          BUILDKIT_INLINE_CACHE=1
 
+    # Build and push BFF Docker image
     - name: Build and push BFF Docker image
       uses: docker/build-push-action@v5
       with:
@@ -140,5 +135,3 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
         platforms: linux/amd64
-        build-args: |
-          BUILDKIT_INLINE_CACHE=1
