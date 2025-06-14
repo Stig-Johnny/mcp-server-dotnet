@@ -1,10 +1,12 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: mcp-server-dotnet
+  name: mcp-server-dotnet-dev
   namespace: argocd
   labels:
     app.kubernetes.io/name: mcp-server-dotnet
+    app.kubernetes.io/instance: dev
+    environment: development
   annotations:
     # ArgoCD Image Updater configuration for automatic Docker image updates
     argocd-image-updater.argoproj.io/image-list: |
@@ -12,22 +14,22 @@ metadata:
       mcp-bff=ghcr.io/stig-johnny/mcp-server-dotnet/mcp-server-bff,
       mcp-gateway=ghcr.io/stig-johnny/mcp-server-dotnet/mcp-gateway
     argocd-image-updater.argoproj.io/mcp-api.update-strategy: latest
-    argocd-image-updater.argoproj.io/mcp-api.allow-tags: regexp:^(main|develop|sha-.*)$
+    argocd-image-updater.argoproj.io/mcp-api.allow-tags: regexp:^(develop|sha-.*)$
     argocd-image-updater.argoproj.io/mcp-api.helm.image-name: api.image.repository
     argocd-image-updater.argoproj.io/mcp-api.helm.image-tag: api.image.tag
     argocd-image-updater.argoproj.io/mcp-api.pull-secret: pullsecret:argocd/ghcr-secret
     argocd-image-updater.argoproj.io/mcp-bff.update-strategy: latest
-    argocd-image-updater.argoproj.io/mcp-bff.allow-tags: regexp:^(main|develop|sha-.*)$
+    argocd-image-updater.argoproj.io/mcp-bff.allow-tags: regexp:^(develop|sha-.*)$
     argocd-image-updater.argoproj.io/mcp-bff.helm.image-name: bff.image.repository
     argocd-image-updater.argoproj.io/mcp-bff.helm.image-tag: bff.image.tag
     argocd-image-updater.argoproj.io/mcp-bff.pull-secret: pullsecret:argocd/ghcr-secret
     argocd-image-updater.argoproj.io/mcp-gateway.update-strategy: latest
-    argocd-image-updater.argoproj.io/mcp-gateway.allow-tags: regexp:^(main|develop|sha-.*)$
+    argocd-image-updater.argoproj.io/mcp-gateway.allow-tags: regexp:^(develop|sha-.*)$
     argocd-image-updater.argoproj.io/mcp-gateway.helm.image-name: gateway.image.repository
     argocd-image-updater.argoproj.io/mcp-gateway.helm.image-tag: gateway.image.tag
     argocd-image-updater.argoproj.io/mcp-gateway.pull-secret: pullsecret:argocd/ghcr-secret
     argocd-image-updater.argoproj.io/write-back-method: git
-    argocd-image-updater.argoproj.io/git-branch: main
+    argocd-image-updater.argoproj.io/git-branch: develop
     argocd-image-updater.argoproj.io/write-back-target: kustomization:helm/mcp-server-dotnet
   finalizers:
     - resources-finalizer.argocd.argoproj.io/resource
@@ -35,17 +37,18 @@ spec:
   project: default
   source:
     repoURL: https://github.com/Stig-Johnny/mcp-server-dotnet.git
-    targetRevision: main
+    targetRevision: develop
     path: helm/mcp-server-dotnet
     helm:
       valueFiles:
         - values.yaml
+        - values-dev.yaml
       parameters:
         - name: global.tag
-          value: main
+          value: develop
   destination:
     server: https://kubernetes.default.svc
-    namespace: mcp-server
+    namespace: mcp-server-dev
   syncPolicy:
     automated:
       prune: true
@@ -62,3 +65,10 @@ spec:
         factor: 2
         maxDuration: 3m
   revisionHistoryLimit: 10
+  info:
+    - name: Purpose
+      value: MCP Server .NET Development Environment
+    - name: Environment
+      value: Development
+    - name: Branch
+      value: develop

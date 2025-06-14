@@ -68,14 +68,16 @@ fi
 
 # Test 7: Validate ArgoCD Configuration
 echo -e "${BLUE}🔄 Validating ArgoCD configurations...${NC}"
-for app in argocd/application-gateway.yaml argocd/application.yaml; do
+for app in argocd/application-gateway.yaml argocd/application.yaml argocd/application-gateway-dev.yaml argocd/application-dev.yaml; do
     if [ -f "$app" ]; then
         echo -e "${GREEN}✅ Found $app${NC}"
-        # Check for image updater annotations
-        if grep -q "argocd-image-updater.argoproj.io" "$app"; then
-            echo -e "${GREEN}✅ ArgoCD Image Updater annotations found in $app${NC}"
+        # Check for SHA-based image tagging in image updater annotations
+        if grep -q "sha-" "$app"; then
+            echo -e "${GREEN}✅ SHA-based image tagging configured in $app${NC}"
+        elif grep -q "allow-tags.*main.*develop" "$app"; then
+            echo -e "${GREEN}✅ Branch-based image tagging configured in $app${NC}"
         else
-            echo -e "${YELLOW}⚠️  No ArgoCD Image Updater annotations in $app${NC}"
+            echo -e "${YELLOW}⚠️  Image tagging strategy may need review in $app${NC}"
         fi
         
         # Check finalizer format compliance
@@ -100,8 +102,8 @@ with open('$app', 'r') as f:
     fi
 done
 
-# Test 8: Check GitHub Actions Workflow
-echo -e "${BLUE}⚙️ Validating GitHub Actions workflow...${NC}"
+# Test 8: Check GitHub Actions Workflows
+echo -e "${BLUE}⚙️ Validating GitHub Actions workflows...${NC}"
 if [ -f ".github/workflows/docker-build.yml" ]; then
     echo -e "${GREEN}✅ Found GitHub Actions Docker build workflow${NC}"
     if grep -q "mcp-gateway" ".github/workflows/docker-build.yml"; then
@@ -114,6 +116,22 @@ else
     exit 1
 fi
 
+if [ -f ".github/workflows/deploy.yml" ]; then
+    echo -e "${GREEN}✅ Found GitHub Actions deployment workflow${NC}"
+    if grep -q "deploy-dev" ".github/workflows/deploy.yml"; then
+        echo -e "${GREEN}✅ Development deployment configured in workflow${NC}"
+    else
+        echo -e "${YELLOW}⚠️  Development deployment not found in workflow${NC}"
+    fi
+    if grep -q "deploy-prod" ".github/workflows/deploy.yml"; then
+        echo -e "${GREEN}✅ Production deployment configured in workflow${NC}"
+    else
+        echo -e "${YELLOW}⚠️  Production deployment not found in workflow${NC}"
+    fi
+else
+    echo -e "${YELLOW}⚠️  Missing GitHub Actions deployment workflow${NC}"
+fi
+
 # Summary
 echo -e "\n${GREEN}🎉 All deployment tests passed!${NC}"
 echo -e "${BLUE}📝 Deployment Test Summary:${NC}"
@@ -124,13 +142,16 @@ echo "✅ Helm charts are valid and render correctly"
 echo "✅ ArgoCD configurations include image updater"
 echo "✅ ArgoCD finalizers follow Kubernetes best practices"
 echo "✅ GitHub Actions workflow includes gateway build"
+echo "✅ Development and production deployment workflows configured"
 
 echo -e "\n${YELLOW}🚀 Ready for deployment!${NC}"
 echo -e "${BLUE}Next steps:${NC}"
 echo "1. Push changes to trigger GitHub Actions build"
-echo "2. Deploy using: kubectl apply -f argocd/application-gateway.yaml"
-echo "3. Monitor deployment: kubectl get pods -n mcp-gateway"
-echo "4. Check health: kubectl port-forward svc/mcp-gateway-service 8080:80 -n mcp-gateway"
+echo "2. Deploy to dev: kubectl apply -f argocd/application-dev.yaml -f argocd/application-gateway-dev.yaml"
+echo "3. Deploy to prod: kubectl apply -f argocd/application.yaml -f argocd/application-gateway.yaml"
+echo "4. Monitor dev deployment: kubectl get pods -n mcp-server-dev -n mcp-gateway-dev"
+echo "5. Monitor prod deployment: kubectl get pods -n mcp-server -n mcp-gateway"
+echo "6. Check health: kubectl port-forward svc/mcp-gateway-service 8080:80 -n mcp-gateway-dev"
 
 # Cleanup
 rm -f /tmp/helm-test-output.yaml

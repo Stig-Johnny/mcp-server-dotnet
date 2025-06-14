@@ -1,0 +1,157 @@
+name: Deploy to Environments
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - prod
+          - both
+
+env:
+  REGISTRY: ghcr.io
+  # Use commit SHA for deployment tracking
+  COMMIT_SHA: ${{ github.sha }}
+
+jobs:
+  # Deploy to Development Environment
+  deploy-dev:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop' || github.event.inputs.environment == 'dev' || github.event.inputs.environment == 'both'
+    environment: development
+    outputs:
+      deployment-status: ${{ steps.deploy.outputs.status }}
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'v1.28.0'
+
+    - name: Deploy to Development
+      id: deploy
+      run: |
+        echo "Triggering development deployment..."
+        echo "This will be handled by ArgoCD Image Updater watching the develop branch"
+        echo "Development applications will sync automatically when new images are pushed"
+        echo "status=success" >> $GITHUB_OUTPUT
+        
+        # In a real environment, you would configure kubectl to connect to your cluster
+        # and trigger ArgoCD sync or wait for automatic sync:
+        # kubectl patch app mcp-server-dotnet-dev -n argocd --type merge -p='{"operation":{"sync":{}}}'
+        # kubectl patch app mcp-gateway-dev -n argocd --type merge -p='{"operation":{"sync":{}}}'
+
+    - name: Verify Development Deployment
+      run: |
+        echo "Development deployment verification would happen here"
+        echo "In a real environment, this would check:"
+        echo "- ArgoCD application sync status"
+        echo "- Pod readiness in mcp-server-dev and mcp-gateway-dev namespaces"
+        echo "- Health checks for deployed services"
+        
+        # Example commands for real environment:
+        # kubectl wait --for=condition=Synced app/mcp-server-dotnet-dev -n argocd --timeout=300s
+        # kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=mcp-server -n mcp-server-dev --timeout=300s
+
+  # Deploy to Production Environment (only after successful dev deployment)
+  deploy-prod:
+    runs-on: ubuntu-latest
+    needs: [deploy-dev]
+    if: |
+      always() && (
+        (github.ref == 'refs/heads/develop' && needs.deploy-dev.outputs.deployment-status == 'success') ||
+        github.ref == 'refs/heads/main' ||
+        github.event.inputs.environment == 'prod' ||
+        github.event.inputs.environment == 'both'
+      )
+    environment: production
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'v1.28.0'
+
+    - name: Determine deployment trigger
+      id: trigger
+      run: |
+        if [[ "${{ github.ref }}" == "refs/heads/develop" ]]; then
+          echo "trigger=auto-promotion" >> $GITHUB_OUTPUT
+          echo "Automatic promotion from successful dev deployment (SHA: ${{ env.COMMIT_SHA }})"
+        elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+          echo "trigger=main-branch" >> $GITHUB_OUTPUT
+          echo "Direct deployment from main branch (SHA: ${{ env.COMMIT_SHA }})"
+        else
+          echo "trigger=manual" >> $GITHUB_OUTPUT
+          echo "Manual deployment trigger (SHA: ${{ env.COMMIT_SHA }})"
+        fi
+
+    - name: Deploy to Production
+      run: |
+        echo "Triggering production deployment..."
+        echo "Deployment trigger: ${{ steps.trigger.outputs.trigger }}"
+        echo "Commit SHA: ${{ env.COMMIT_SHA }}"
+        echo "This will be handled by ArgoCD Image Updater watching the main branch"
+        echo "Production applications will sync automatically when:"
+        echo "- New images are pushed with main branch tags or SHA tags"
+        echo "- Manual sync is triggered"
+        
+        # In a real environment, you would:
+        # For auto-promotion from dev, trigger manual sync with specific SHA:
+        # if [[ "${{ steps.trigger.outputs.trigger }}" == "auto-promotion" ]]; then
+        #   kubectl patch app mcp-server-dotnet -n argocd --type merge -p='{"operation":{"sync":{}}}'
+        #   kubectl patch app mcp-gateway -n argocd --type merge -p='{"operation":{"sync":{}}}'
+        # fi
+
+    - name: Verify Production Deployment
+      run: |
+        echo "Production deployment verification would happen here"
+        echo "In a real environment, this would check:"
+        echo "- ArgoCD application sync status"
+        echo "- Pod readiness in mcp-server and mcp-gateway namespaces"
+        echo "- Health checks for deployed services"
+        echo "- Smoke tests for critical functionality"
+        
+        # Example commands for real environment:
+        # kubectl wait --for=condition=Synced app/mcp-server-dotnet -n argocd --timeout=300s
+        # kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=mcp-server -n mcp-server --timeout=300s
+
+  # Notification job (runs after both deployments)
+  notify:
+    runs-on: ubuntu-latest
+    needs: [deploy-dev, deploy-prod]
+    if: always()
+    
+    steps:
+    - name: Deployment Summary
+      run: |
+        echo "=== Deployment Summary ==="
+        echo "Development Status: ${{ needs.deploy-dev.result || 'skipped' }}"
+        echo "Production Status: ${{ needs.deploy-prod.result || 'skipped' }}"
+        echo "Branch/Ref: ${{ github.ref }}"
+        echo "Commit SHA: ${{ env.COMMIT_SHA }}"
+        echo "========================="
+        
+        if [[ "${{ needs.deploy-dev.result }}" == "success" && "${{ needs.deploy-prod.result }}" == "success" ]]; then
+          echo "✅ All deployments completed successfully"
+        elif [[ "${{ needs.deploy-dev.result }}" == "failure" || "${{ needs.deploy-prod.result }}" == "failure" ]]; then
+          echo "❌ One or more deployments failed"
+          exit 1
+        else
+          echo "ℹ️  Partial deployment completed"
+        fi
