@@ -1,0 +1,78 @@
+# Staging Values for MCP Server .NET
+global:
+  registry: ghcr.io
+  repository: stig-johnny/mcp-server-dotnet
+  tag: "main"
+  pullPolicy: Always
+
+api:
+  enabled: true
+  replicaCount: 2
+  
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 200m
+      memory: 256Mi
+  
+  env:
+    - name: ASPNETCORE_ENVIRONMENT
+      value: "Staging"
+    - name: ASPNETCORE_URLS
+      value: "http://+:8080"
+
+bff:
+  enabled: true
+  replicaCount: 2
+  
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 200m
+      memory: 256Mi
+  
+  env:
+    - name: ASPNETCORE_ENVIRONMENT
+      value: "Staging"
+    - name: ASPNETCORE_URLS
+      value: "http://+:8080"
+
+gateway:
+  enabled: true
+  replicaCount: 2
+  
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  
+  env:
+    - name: ASPNETCORE_ENVIRONMENT
+      value: "Staging"
+
+# Note: Ingress with custom domains is disabled as it will be handled by external software
+ingress:
+  enabled: false
+  className: "nginx"
+  hosts: []
+  tls: []
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 4
+  targetCPUUtilizationPercentage: 70
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+monitoring:
+  enabled: true

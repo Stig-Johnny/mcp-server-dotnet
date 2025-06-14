@@ -1,21 +1,33 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: mcp-gateway
+  name: mcp-server-dotnet-staging
   namespace: argocd
   labels:
-    app.kubernetes.io/name: mcp-gateway
-    app.kubernetes.io/component: gateway
+    app.kubernetes.io/name: mcp-server-dotnet
+    app.kubernetes.io/instance: staging
+    environment: staging
   annotations:
-    argocd.argoproj.io/sync-wave: "0"
     # ArgoCD Image Updater configuration for automatic Docker image updates
-    argocd-image-updater.argoproj.io/image-list: mcp-gateway=ghcr.io/stig-johnny/mcp-server-dotnet/mcp-gateway
+    argocd-image-updater.argoproj.io/image-list: |
+      mcp-api=ghcr.io/stig-johnny/mcp-server-dotnet/mcp-server-api,
+      mcp-bff=ghcr.io/stig-johnny/mcp-server-dotnet/mcp-server-bff,
+      mcp-gateway=ghcr.io/stig-johnny/mcp-server-dotnet/mcp-gateway
+    argocd-image-updater.argoproj.io/mcp-api.update-strategy: latest
+    argocd-image-updater.argoproj.io/mcp-api.allow-tags: regexp:^(main|sha-.*)$
+    argocd-image-updater.argoproj.io/mcp-api.helm.image-name: api.image.repository
+    argocd-image-updater.argoproj.io/mcp-api.helm.image-tag: api.image.tag
+    argocd-image-updater.argoproj.io/mcp-api.pull-secret: pullsecret:argocd/ghcr-secret
+    argocd-image-updater.argoproj.io/mcp-bff.update-strategy: latest
+    argocd-image-updater.argoproj.io/mcp-bff.allow-tags: regexp:^(main|sha-.*)$
+    argocd-image-updater.argoproj.io/mcp-bff.helm.image-name: bff.image.repository
+    argocd-image-updater.argoproj.io/mcp-bff.helm.image-tag: bff.image.tag
+    argocd-image-updater.argoproj.io/mcp-bff.pull-secret: pullsecret:argocd/ghcr-secret
     argocd-image-updater.argoproj.io/mcp-gateway.update-strategy: latest
     argocd-image-updater.argoproj.io/mcp-gateway.allow-tags: regexp:^(main|sha-.*)$
     argocd-image-updater.argoproj.io/mcp-gateway.helm.image-name: gateway.image.repository
     argocd-image-updater.argoproj.io/mcp-gateway.helm.image-tag: gateway.image.tag
     argocd-image-updater.argoproj.io/mcp-gateway.pull-secret: pullsecret:argocd/ghcr-secret
-    argocd-image-updater.argoproj.io/mcp-gateway.force-update: "true"
     argocd-image-updater.argoproj.io/write-back-method: git
     argocd-image-updater.argoproj.io/git-branch: main
     argocd-image-updater.argoproj.io/write-back-target: kustomization:helm/mcp-server-dotnet
@@ -29,17 +41,14 @@ spec:
     path: helm/mcp-server-dotnet
     helm:
       valueFiles:
-        - values-gateway.yaml
+        - values.yaml
+        - values-staging.yaml
       parameters:
         - name: global.tag
           value: main
-        - name: gateway.enabled
-          value: "true"
-        - name: gateway.replicaCount
-          value: "3"
   destination:
     server: https://kubernetes.default.svc
-    namespace: mcp-gateway
+    namespace: mcp-server-staging
   syncPolicy:
     automated:
       prune: true
@@ -49,23 +58,17 @@ spec:
       - CreateNamespace=true
       - PrunePropagationPolicy=foreground
       - PruneLast=true
-      - RespectIgnoreDifferences=true
     retry:
       limit: 5
       backoff:
-        duration: 10s
+        duration: 5s
         factor: 2
-        maxDuration: 5m
+        maxDuration: 3m
   revisionHistoryLimit: 10
-  ignoreDifferences:
-    - group: apps
-      kind: Deployment
-      managedFieldsManagers:
-        - kube-controller-manager
   info:
     - name: Purpose
-      value: MCP Protocol Gateway for Model Context Protocol compliance
+      value: MCP Server .NET Staging Environment
     - name: Environment
-      value: Production
-    - name: Documentation
-      value: https://github.com/Stig-Johnny/mcp-server-dotnet/blob/main/docs/argocd-deployment.md
+      value: Staging
+    - name: Branch
+      value: main

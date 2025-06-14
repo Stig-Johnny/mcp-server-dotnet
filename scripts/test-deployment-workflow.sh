@@ -22,7 +22,7 @@ if [ ! -f ".github/workflows/deploy.yml" ]; then
 fi
 
 # Check for required jobs
-required_jobs=("deploy-dev" "deploy-prod" "notify")
+required_jobs=("deploy-staging" "deploy-production" "notify")
 for job in "${required_jobs[@]}"; do
     if grep -q "  $job:" ".github/workflows/deploy.yml"; then
         echo -e "${GREEN}✅ Found job: $job${NC}"
@@ -40,6 +40,8 @@ required_apps=(
     "argocd/application-gateway.yaml" 
     "argocd/application-dev.yaml"
     "argocd/application-gateway-dev.yaml"
+    "argocd/application-staging.yaml"
+    "argocd/application-gateway-staging.yaml"
 )
 
 for app in "${required_apps[@]}"; do
@@ -55,10 +57,10 @@ done
 echo -e "${BLUE}📋 Test 3: Validating environment configurations...${NC}"
 
 # Check dev applications target correct branch and namespace
-if grep -q "targetRevision: develop" "argocd/application-dev.yaml"; then
-    echo -e "${GREEN}✅ Dev application targets develop branch${NC}"
+if grep -q "targetRevision: main" "argocd/application-dev.yaml"; then
+    echo -e "${GREEN}✅ Dev application targets main branch${NC}"
 else
-    echo -e "${RED}❌ Dev application does not target develop branch${NC}"
+    echo -e "${RED}❌ Dev application does not target main branch${NC}"
     exit 1
 fi
 
@@ -66,6 +68,21 @@ if grep -q "namespace: mcp-server-dev" "argocd/application-dev.yaml"; then
     echo -e "${GREEN}✅ Dev application targets dev namespace${NC}"
 else
     echo -e "${RED}❌ Dev application does not target dev namespace${NC}"
+    exit 1
+fi
+
+# Check staging applications target correct branch and namespace
+if grep -q "targetRevision: main" "argocd/application-staging.yaml"; then
+    echo -e "${GREEN}✅ Staging application targets main branch${NC}"
+else
+    echo -e "${RED}❌ Staging application does not target main branch${NC}"
+    exit 1
+fi
+
+if grep -q "namespace: mcp-server-staging" "argocd/application-staging.yaml"; then
+    echo -e "${GREEN}✅ Staging application targets staging namespace${NC}"
+else
+    echo -e "${RED}❌ Staging application does not target staging namespace${NC}"
     exit 1
 fi
 
@@ -87,10 +104,10 @@ fi
 # Test 4: Validate workflow triggers
 echo -e "${BLUE}📋 Test 4: Validating workflow triggers...${NC}"
 
-if grep -q "      - develop" ".github/workflows/deploy.yml"; then
-    echo -e "${GREEN}✅ Workflow triggers on develop branch${NC}"
+if ! grep -q "      - develop" ".github/workflows/deploy.yml"; then
+    echo -e "${GREEN}✅ Workflow does not trigger on develop branch${NC}"
 else
-    echo -e "${RED}❌ Workflow does not trigger on develop branch${NC}"
+    echo -e "${RED}❌ Workflow should not trigger on develop branch${NC}"
     exit 1
 fi
 
@@ -104,29 +121,37 @@ fi
 # Test 5: Validate dependency chain
 echo -e "${BLUE}📋 Test 5: Validating deployment dependency chain...${NC}"
 
-if grep -q "needs: \[deploy-dev\]" ".github/workflows/deploy.yml"; then
-    echo -e "${GREEN}✅ Production deployment depends on dev deployment${NC}"
+if grep -q "needs: \[deploy-staging\]" ".github/workflows/deploy.yml"; then
+    echo -e "${GREEN}✅ Production deployment depends on staging deployment${NC}"
 else
-    echo -e "${RED}❌ Production deployment does not depend on dev deployment${NC}"
+    echo -e "${RED}❌ Production deployment does not depend on staging deployment${NC}"
     exit 1
 fi
 
 # Test 6: Validate image tag configurations
 echo -e "${BLUE}📋 Test 6: Validating image tag configurations...${NC}"
 
-# Dev applications should use develop and SHA tags
-if grep -q "allow-tags: regexp:\\^(develop|sha-.*)\\$" "argocd/application-dev.yaml"; then
-    echo -e "${GREEN}✅ Dev application configured for develop and SHA tags${NC}"
+# Dev applications should use main and SHA tags
+if grep -q "allow-tags: regexp:\\^(main|sha-.*)\\$" "argocd/application-dev.yaml"; then
+    echo -e "${GREEN}✅ Dev application configured for main and SHA tags${NC}"
 else
-    echo -e "${RED}❌ Dev application not configured for develop and SHA tags${NC}"
+    echo -e "${RED}❌ Dev application not configured for main and SHA tags${NC}"
     exit 1
 fi
 
-# Prod applications should use main/develop/SHA tags (no version tags)
-if grep -q "allow-tags: regexp:\\^(main|develop|sha-.*)\\$" "argocd/application.yaml"; then
-    echo -e "${GREEN}✅ Prod application configured for main/develop/SHA tags${NC}"
+# Staging applications should use main and SHA tags  
+if grep -q "allow-tags: regexp:\\^(main|sha-.*)\\$" "argocd/application-staging.yaml"; then
+    echo -e "${GREEN}✅ Staging application configured for main and SHA tags${NC}"
 else
-    echo -e "${RED}❌ Prod application not configured for main/develop/SHA tags${NC}"
+    echo -e "${RED}❌ Staging application not configured for main and SHA tags${NC}"
+    exit 1
+fi
+
+# Prod applications should use main and SHA tags (no develop tags)
+if grep -q "allow-tags: regexp:\\^(main|sha-.*)\\$" "argocd/application.yaml"; then
+    echo -e "${GREEN}✅ Prod application configured for main and SHA tags${NC}"
+else
+    echo -e "${RED}❌ Prod application not configured for main and SHA tags${NC}"
     exit 1
 fi
 
@@ -140,7 +165,14 @@ else
     exit 1
 fi
 
-if grep -q "values-prod.yaml" "argocd/application.yaml" || ! grep -q "values-dev.yaml" "argocd/application.yaml"; then
+if grep -q "values-staging.yaml" "argocd/application-staging.yaml"; then
+    echo -e "${GREEN}✅ Staging application uses staging values${NC}"
+else
+    echo -e "${RED}❌ Staging application does not use staging values${NC}"
+    exit 1
+fi
+
+if ! grep -q "values-dev.yaml\|values-staging.yaml" "argocd/application.yaml"; then
     echo -e "${GREEN}✅ Prod application uses appropriate values${NC}"
 else
     echo -e "${RED}❌ Prod application values configuration incorrect${NC}"
@@ -150,19 +182,19 @@ fi
 # Test 8: Simulate workflow execution logic
 echo -e "${BLUE}📋 Test 8: Simulating workflow logic...${NC}"
 
-echo -e "${BLUE}  Scenario 1: Push to develop branch${NC}"
-echo "    - Should trigger deploy-dev job: ✅"
-echo "    - Should trigger deploy-prod job after dev success: ✅"
-echo "    - Should use develop/SHA images for environments: ✅"
+echo -e "${BLUE}  Scenario 1: Push to main branch${NC}"
+echo "    - Should trigger deploy-staging job: ✅"
+echo "    - Should trigger deploy-production job after staging success: ✅"
+echo "    - Should use main/SHA images for all environments: ✅"
 
-echo -e "${BLUE}  Scenario 2: Push to main branch${NC}"
-echo "    - Should skip deploy-dev job: ✅"
-echo "    - Should trigger deploy-prod job directly: ✅"
-echo "    - Should use main/SHA images for prod environment: ✅"
-
-echo -e "${BLUE}  Scenario 3: Manual deployment${NC}"
+echo -e "${BLUE}  Scenario 2: Manual deployment${NC}"
 echo "    - Should allow targeting specific environments: ✅"
 echo "    - Should use commit SHA for deployment tracking: ✅"
+
+echo -e "${BLUE}  Scenario 3: GitOps promotion workflow${NC}"
+echo "    - Dev environment promoted from main branch: ✅"
+echo "    - Staging environment promoted from main branch: ✅"
+echo "    - Production environment promoted after staging validation: ✅"
 
 # Summary
 echo -e "\n${GREEN}🎉 All deployment workflow tests passed!${NC}"
@@ -177,8 +209,8 @@ echo "✅ Helm values files are properly configured"
 echo "✅ Workflow logic scenarios validated"
 
 echo -e "\n${YELLOW}🚀 Deployment workflow ready for use!${NC}"
-echo -e "${BLUE}Deployment Flow:${NC}"
-echo "1. Push to develop → Deploy to dev → Auto-promote to prod (SHA-based)"
-echo "2. Push to main → Deploy directly to prod (SHA-based)"
-echo "3. Manual trigger → Deploy to specified environment (SHA-based)"
+echo -e "${BLUE}GitOps Deployment Flow:${NC}"
+echo "1. Push to main → Deploy to staging → Auto-promote to production (SHA-based)"
+echo "2. Manual trigger → Deploy to specified environment (SHA-based)"
+echo "3. All environments use main branch builds for consistency"
 echo "4. All deployments use commit SHA for tracking and promotion"

@@ -68,7 +68,7 @@ fi
 
 # Test 7: Validate ArgoCD Configuration
 echo -e "${BLUE}🔄 Validating ArgoCD configurations...${NC}"
-for app in argocd/application-gateway.yaml argocd/application.yaml argocd/application-gateway-dev.yaml argocd/application-dev.yaml; do
+for app in argocd/application-gateway.yaml argocd/application.yaml argocd/application-gateway-dev.yaml argocd/application-dev.yaml argocd/application-gateway-staging.yaml argocd/application-staging.yaml; do
     if [ -f "$app" ]; then
         echo -e "${GREEN}✅ Found $app${NC}"
         # Check for SHA-based image tagging in image updater annotations
@@ -118,12 +118,12 @@ fi
 
 if [ -f ".github/workflows/deploy.yml" ]; then
     echo -e "${GREEN}✅ Found GitHub Actions deployment workflow${NC}"
-    if grep -q "deploy-dev" ".github/workflows/deploy.yml"; then
-        echo -e "${GREEN}✅ Development deployment configured in workflow${NC}"
+    if grep -q "deploy-staging" ".github/workflows/deploy.yml"; then
+        echo -e "${GREEN}✅ Staging deployment configured in workflow${NC}"
     else
-        echo -e "${YELLOW}⚠️  Development deployment not found in workflow${NC}"
+        echo -e "${YELLOW}⚠️  Staging deployment not found in workflow${NC}"
     fi
-    if grep -q "deploy-prod" ".github/workflows/deploy.yml"; then
+    if grep -q "deploy-production" ".github/workflows/deploy.yml"; then
         echo -e "${GREEN}✅ Production deployment configured in workflow${NC}"
     else
         echo -e "${YELLOW}⚠️  Production deployment not found in workflow${NC}"
@@ -142,14 +142,14 @@ echo "✅ Helm charts are valid and render correctly"
 echo "✅ ArgoCD configurations include image updater"
 echo "✅ ArgoCD finalizers follow Kubernetes best practices"
 echo "✅ GitHub Actions workflow includes gateway build"
-echo "✅ Development and production deployment workflows configured"
+echo "✅ Staging and production deployment workflows configured"
 
 echo -e "\n${YELLOW}🚀 Ready for deployment!${NC}"
 echo -e "${BLUE}Next steps:${NC}"
 echo "1. Push changes to trigger GitHub Actions build"
-echo "2. Deploy to dev: kubectl apply -f argocd/application-dev.yaml -f argocd/application-gateway-dev.yaml"
+echo "2. Deploy to staging: kubectl apply -f argocd/application-staging.yaml -f argocd/application-gateway-staging.yaml"
 echo "3. Deploy to prod: kubectl apply -f argocd/application.yaml -f argocd/application-gateway.yaml"
-echo "4. Monitor dev deployment: kubectl get pods -n mcp-server-dev -n mcp-gateway-dev"
+echo "4. Monitor staging deployment: kubectl get pods -n mcp-server-staging -n mcp-gateway-staging"
 echo "5. Monitor prod deployment: kubectl get pods -n mcp-server -n mcp-gateway"
 echo "6. Check health: kubectl port-forward svc/mcp-gateway-service 8080:80 -n mcp-gateway-dev"
 
