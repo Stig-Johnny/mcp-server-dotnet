@@ -52,4 +52,34 @@ public class AssetsApiTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.Contains("\"createdAt\":", jsonString);
         Assert.Contains("Sample Asset", jsonString);
     }
+
+    [Fact]
+    public async Task GetRoot_ShouldReturnReactApp()
+    {
+        // Act
+        var response = await _client.GetAsync("/");
+
+        // Assert
+        response.EnsureSuccessStatusCode();
+        Assert.Equal("text/html", response.Content.Headers.ContentType?.ToString());
+        
+        var content = await response.Content.ReadAsStringAsync();
+        Assert.Contains("<title>React App</title>", content);
+        Assert.Contains("<div id=\"root\">", content);
+    }
+
+    [Fact]
+    public async Task GetNonExistentPath_ShouldReturnReactAppForClientSideRouting()
+    {
+        // Act - Test fallback routing for React app
+        var response = await _client.GetAsync("/some-non-existent-path");
+
+        // Assert
+        response.EnsureSuccessStatusCode();
+        Assert.Equal("text/html", response.Content.Headers.ContentType?.ToString());
+        
+        var content = await response.Content.ReadAsStringAsync();
+        Assert.Contains("<title>React App</title>", content);
+        Assert.Contains("<div id=\"root\">", content);
+    }
 }

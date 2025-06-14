@@ -11,4 +11,36 @@
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Exclude frontend build files from default content items -->
+    <Content Remove="frontend\build\**" />
+    <Content Remove="frontend\**" />
+    <None Include="frontend\**" />
+  </ItemGroup>
+
+  <Target Name="BuildFrontend" BeforeTargets="Build">
+    <!-- Build React app if frontend directory exists -->
+    <Exec Command="npm run build" WorkingDirectory="frontend" Condition="Exists('frontend\package.json')" />
+    
+    <!-- Copy React build output to wwwroot -->
+    <ItemGroup>
+      <FrontendFiles Include="frontend\build\**\*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(FrontendFiles)" DestinationFolder="wwwroot\%(RecursiveDir)" SkipUnchangedFiles="true" Condition="Exists('frontend\build')" />
+  </Target>
+
+  <Target Name="PublishRunWebpack" AfterTargets="ComputeFilesToPublish">
+    <!-- Ensure frontend is built for publish -->
+    <Exec Command="npm run build" WorkingDirectory="frontend" Condition="Exists('frontend\package.json')" />
+    
+    <!-- Include React build files in publish -->
+    <ItemGroup>
+      <DistFiles Include="frontend\build\**\*" />
+      <ResolvedFileToPublish Include="@(DistFiles->'%(FullPath)')" Exclude="@(ResolvedFileToPublish)">
+        <RelativePath>wwwroot\%(RecursiveDir)%(DistFiles.Filename)%(DistFiles.Extension)</RelativePath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
+
 </Project>

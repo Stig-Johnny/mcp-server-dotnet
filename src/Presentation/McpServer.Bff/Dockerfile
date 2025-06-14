@@ -5,10 +5,20 @@ EXPOSE 443
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
+
+# Install Node.js for React build
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+    && apt-get install -y nodejs
+
 COPY ["src/Presentation/McpServer.Bff/McpServer.Bff.csproj", "src/Presentation/McpServer.Bff/"]
 RUN dotnet restore "src/Presentation/McpServer.Bff/McpServer.Bff.csproj"
+
 COPY . .
 WORKDIR "/src/src/Presentation/McpServer.Bff"
+
+# Install npm dependencies and build React app
+RUN cd frontend && npm ci && npm run build
+
 RUN dotnet build "McpServer.Bff.csproj" -c Release -o /app/build
 
 FROM build AS publish

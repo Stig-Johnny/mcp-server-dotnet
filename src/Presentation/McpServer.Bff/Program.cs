@@ -25,6 +25,10 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+// Serve static files from the React build output
+app.UseStaticFiles();
+app.UseDefaultFiles();
+
 // Assets endpoint - mocked for now
 app.MapGet("/api/assets", () =>
 {
@@ -40,6 +44,22 @@ app.MapGet("/api/assets", () =>
 .WithName("GetAssets")
 .WithOpenApi()
 .Produces<object[]>(StatusCodes.Status200OK);
+
+// Fallback to serve React app for client-side routing
+app.MapFallback(async context =>
+{
+    context.Response.ContentType = "text/html";
+    var indexPath = Path.Combine(app.Environment.WebRootPath, "index.html");
+    if (File.Exists(indexPath))
+    {
+        await context.Response.SendFileAsync(indexPath);
+    }
+    else
+    {
+        context.Response.StatusCode = 404;
+        await context.Response.WriteAsync("React app not found. Make sure to build the frontend first.");
+    }
+});
 
 app.Run();
 
