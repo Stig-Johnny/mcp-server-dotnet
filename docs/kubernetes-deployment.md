@@ -136,6 +136,177 @@ curl http://localhost:8080/api/mcp/resources
 
 ## Configuration
 
+### Hostname Configuration
+
+The MCP Server .NET application uses different hostnames for different deployment scenarios. Understanding these hostnames is crucial for proper DNS setup and ingress configuration.
+
+#### Hostname Overview
+
+| Environment | Hostname | Purpose | Routes |
+|-------------|----------|---------|--------|
+| **Development** | `mcp-server-dev.yourdomain.com` | Development testing and staging | `/api` → API service<br>`/` → BFF service |
+| **Production** | `mcp-server.yourdomain.com` | Production deployment | `/api` → API service<br>`/` → BFF service |
+| **Gateway** | `mcp-gateway.local` | MCP protocol compliance | `/api/mcp` → Gateway service<br>`/health` → Gateway service<br>`/swagger` → Gateway service<br>`/api` → API service |
+
+#### Hostname Purposes
+
+- **Development/Production hostnames** (`mcp-server-dev.yourdomain.com`, `mcp-server.yourdomain.com`):
+  - Full application deployment with both API and BFF (Backend-for-Frontend) services
+  - BFF serves the React frontend application
+  - API provides the core MCP server functionality
+  - Suitable for complete application testing and production use
+
+- **Gateway hostname** (`mcp-gateway.local`):
+  - Focused on MCP protocol compliance
+  - Optimized for production MCP protocol operations
+  - Direct access to MCP endpoints without frontend overhead
+  - Includes health checks and API documentation routes
+
+#### Setting Up Hostnames
+
+##### Option 1: Kubernetes Ingress with DNS
+
+1. **Configure your DNS provider** to point hostnames to your Kubernetes cluster's ingress controller:
+   ```bash
+   # Example DNS A records
+   mcp-server.yourdomain.com        → <ingress-controller-ip>
+   mcp-server-dev.yourdomain.com    → <ingress-controller-ip>
+   mcp-gateway.local                → <ingress-controller-ip>
+   ```
+
+2. **Update Helm values** with your actual domain:
+   ```yaml
+   # values-prod.yaml
+   ingress:
+     hosts:
+       - host: mcp-server.yourdomain.com  # Replace with your domain
+   
+   # values-dev.yaml
+   ingress:
+     hosts:  
+       - host: mcp-server-dev.yourdomain.com  # Replace with your domain
+   
+   # values-gateway.yaml
+   ingress:
+     hosts:
+       - host: mcp-gateway.yourdomain.com  # Replace with your domain if needed
+   ```
+
+3. **Configure TLS certificates** (recommended for production):
+   ```yaml
+   ingress:
+     tls:
+       - secretName: mcp-server-tls
+         hosts:
+           - mcp-server.yourdomain.com
+   ```
+
+##### Option 2: Cloudflare Tunnels
+
+Cloudflare Tunnels provide secure access without exposing your cluster directly to the internet.
+
+1. **Install cloudflared** in your cluster:
+   ```bash
+   # Create tunnel
+   cloudflared tunnel create mcp-server
+   
+   # Generate configuration
+   cat > config.yaml << EOF
+   tunnel: <tunnel-id>
+   credentials-file: /etc/cloudflared/creds/<tunnel-id>.json
+   
+   ingress:
+     - hostname: mcp-server.yourdomain.com
+       service: http://mcp-server-service.mcp-server.svc.cluster.local:80
+     - hostname: mcp-server-dev.yourdomain.com  
+       service: http://mcp-server-service.mcp-server-dev.svc.cluster.local:80
+     - hostname: mcp-gateway.yourdomain.com
+       service: http://mcp-gateway-service.mcp-gateway.svc.cluster.local:80
+     - service: http_status:404
+   EOF
+   ```
+
+2. **Deploy Cloudflare tunnel** to Kubernetes:
+   ```bash
+   kubectl create secret generic tunnel-credentials \
+     --from-file=credentials.json=/path/to/<tunnel-id>.json \
+     --namespace=mcp-server
+   
+   kubectl create configmap tunnel-config \
+     --from-file=config.yaml=config.yaml \
+     --namespace=mcp-server
+   ```
+
+3. **Create tunnel deployment**:
+   ```yaml
+   apiVersion: apps/v1
+   kind: Deployment
+   metadata:
+     name: cloudflared
+     namespace: mcp-server
+   spec:
+     replicas: 2
+     selector:
+       matchLabels:
+         app: cloudflared
+     template:
+       metadata:
+         labels:
+           app: cloudflared
+       spec:
+         containers:
+         - name: cloudflared
+           image: cloudflare/cloudflared:latest
+           args:
+           - tunnel
+           - --config
+           - /etc/cloudflared/config/config.yaml
+           - run
+           volumeMounts:
+           - name: config
+             mountPath: /etc/cloudflared/config
+           - name: creds
+             mountPath: /etc/cloudflared/creds
+         volumes:
+         - name: config
+           configMap:
+             name: tunnel-config
+         - name: creds
+           secret:
+             secretName: tunnel-credentials
+   ```
+
+##### Option 3: Local Development (Port Forwarding)
+
+For local testing without DNS setup:
+
+```bash
+# Forward services to localhost
+kubectl port-forward svc/mcp-server-service 8080:80 -n mcp-server
+kubectl port-forward svc/mcp-gateway-service 8081:80 -n mcp-gateway
+
+# Access via localhost
+curl http://localhost:8080/api/mcp/tools
+curl http://localhost:8081/api/mcp/tools
+```
+
+#### Verification
+
+After setting up hostnames, verify your configuration:
+
+```bash
+# Test hostname resolution
+nslookup mcp-server.yourdomain.com
+nslookup mcp-server-dev.yourdomain.com
+
+# Test HTTP endpoints
+curl -k https://mcp-server.yourdomain.com/health
+curl -k https://mcp-gateway.yourdomain.com/health
+
+# Verify MCP protocol endpoints
+curl -k https://mcp-gateway.yourdomain.com/api/mcp/tools
+```
+
 ### Environment-specific Values
 
 Create environment-specific values files:
@@ -409,6 +580,7 @@ helm rollback mcp-server 2 -n mcp-server
 
 ## Production Checklist
 
+- [ ] Configure hostnames and DNS (see [Hostname Configuration](#hostname-configuration))
 - [ ] Update ingress host to production domain
 - [ ] Configure TLS certificates
 - [ ] Set appropriate resource limits
