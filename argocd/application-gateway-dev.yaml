@@ -1,0 +1,76 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mcp-gateway-dev
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: mcp-gateway
+    app.kubernetes.io/component: gateway
+    app.kubernetes.io/instance: dev 
+    environment: development
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+    # ArgoCD Image Updater configuration for automatic Docker image updates
+    argocd-image-updater.argoproj.io/image-list: mcp-gateway=ghcr.io/stig-johnny/mcp-server-dotnet/mcp-gateway
+    argocd-image-updater.argoproj.io/mcp-gateway.update-strategy: latest
+    argocd-image-updater.argoproj.io/mcp-gateway.allow-tags: regexp:^(develop)$
+    argocd-image-updater.argoproj.io/mcp-gateway.helm.image-name: gateway.image.repository
+    argocd-image-updater.argoproj.io/mcp-gateway.helm.image-tag: gateway.image.tag
+    argocd-image-updater.argoproj.io/mcp-gateway.pull-secret: pullsecret:argocd/ghcr-secret
+    argocd-image-updater.argoproj.io/mcp-gateway.force-update: "true"
+    argocd-image-updater.argoproj.io/write-back-method: git
+    argocd-image-updater.argoproj.io/git-branch: develop
+    argocd-image-updater.argoproj.io/write-back-target: kustomization:helm/mcp-server-dotnet
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io/resource
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Stig-Johnny/mcp-server-dotnet.git
+    targetRevision: develop
+    path: helm/mcp-server-dotnet
+    helm:
+      valueFiles:
+        - values-gateway.yaml
+        - values-dev.yaml
+      parameters:
+        - name: global.tag
+          value: develop
+        - name: gateway.enabled
+          value: "true"
+        - name: gateway.replicaCount
+          value: "1"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-gateway-dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m
+  revisionHistoryLimit: 10
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      managedFieldsManagers:
+        - kube-controller-manager
+  info:
+    - name: Purpose
+      value: MCP Protocol Gateway for Model Context Protocol compliance - Development
+    - name: Environment
+      value: Development
+    - name: Branch
+      value: develop
+    - name: Documentation
+      value: https://github.com/Stig-Johnny/mcp-server-dotnet/blob/main/docs/argocd-deployment.md
