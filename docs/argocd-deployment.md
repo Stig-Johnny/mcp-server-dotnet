@@ -431,13 +431,13 @@ argocd-image-updater.argoproj.io/mcp-api.helm.image-tag: api.image.tag
 
 # BFF Service
 argocd-image-updater.argoproj.io/mcp-bff.update-strategy: latest
-argocd-image-updater.argoproj.io/mcp-bff.allow-tags: regexp:^(main|develop|v.*)$
+argocd-image-updater.argoproj.io/mcp-bff.allow-tags: regexp:^(main|v.*)$
 argocd-image-updater.argoproj.io/mcp-bff.helm.image-name: bff.image.repository
 argocd-image-updater.argoproj.io/mcp-bff.helm.image-tag: bff.image.tag
 
 # Gateway Service
 argocd-image-updater.argoproj.io/mcp-gateway.update-strategy: latest
-argocd-image-updater.argoproj.io/mcp-gateway.allow-tags: regexp:^(main|develop|v.*)$
+argocd-image-updater.argoproj.io/mcp-gateway.allow-tags: regexp:^(main|v.*)$
 argocd-image-updater.argoproj.io/mcp-gateway.helm.image-name: gateway.image.repository
 argocd-image-updater.argoproj.io/mcp-gateway.helm.image-tag: gateway.image.tag
 ```
@@ -460,7 +460,7 @@ regexp:^(main|develop|v.*)$
 regexp:^v\d+\.\d+\.\d+$
 
 # Allow specific branches
-regexp:^(main|staging)$
+regexp:^(main|v.*)$
 ```
 
 ## Deployment Procedures
@@ -519,7 +519,7 @@ Before production deployment, validate your configuration:
 #### Development Environment
 
 ```bash
-# Deploy to development with dev tag
+# Deploy to development with main tag
 kubectl apply -f - <<EOF
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -530,7 +530,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/Stig-Johnny/mcp-server-dotnet.git
-    targetRevision: develop
+    targetRevision: main
     path: helm/mcp-server-dotnet
     helm:
       valueFiles:
@@ -538,7 +538,7 @@ spec:
         - values-dev.yaml
       parameters:
         - name: global.tag
-          value: develop
+          value: main
   destination:
     server: https://kubernetes.default.svc
     namespace: mcp-gateway-dev
@@ -549,10 +549,43 @@ spec:
 EOF
 ```
 
+#### Staging Environment
+
+```bash
+# Deploy to staging with main tag (GitOps promotion step)
+kubectl apply -f - <<EOF
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mcp-gateway-staging
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Stig-Johnny/mcp-server-dotnet.git
+    targetRevision: main
+    path: helm/mcp-server-dotnet
+    helm:
+      valueFiles:
+        - values-gateway.yaml
+        - values-staging.yaml
+      parameters:
+        - name: global.tag
+          value: main
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: mcp-gateway-staging
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+EOF
+```
+
 #### Production Environment
 
 ```bash
-# Deploy to production with version tag
+# Deploy to production with version tag (final GitOps promotion step)
 kubectl apply -f - <<EOF
 apiVersion: argoproj.io/v1alpha1
 kind: Application

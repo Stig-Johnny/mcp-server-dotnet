@@ -59,12 +59,25 @@ kubectl apply -f argocd/application-gateway.yaml
 kubectl apply -f argocd/application.yaml
 ```
 
+4. Deploy staging environment (for validation):
+```bash
+kubectl apply -f argocd/application-staging.yaml
+kubectl apply -f argocd/application-gateway-staging.yaml
+```
+
+5. Deploy development environment (for testing):
+```bash
+kubectl apply -f argocd/application-dev.yaml
+kubectl apply -f argocd/application-gateway-dev.yaml
+```
+
 #### Automatic Updates
 The ArgoCD applications are configured with argocd-image-updater annotations that will:
 - ✅ Monitor GitHub Container Registry for new image tags
-- ✅ Automatically update deployments when new `main`, `develop`, or `v*` tags are pushed
+- ✅ Automatically update deployments when new `main` or `v*` tags are pushed
 - ✅ Update Helm values files via Git commits
 - ✅ Trigger ArgoCD sync automatically
+- ✅ Follow GitOps promotion workflow (staging → production)
 
 #### Monitoring Updates
 Check image updater status:
@@ -357,7 +370,7 @@ autoscaling:
 #### Development (`values-dev.yaml`)
 ```yaml
 global:
-  tag: "develop"
+  tag: "main"
 
 api:
   replicaCount: 1
@@ -376,6 +389,34 @@ bff:
 # Note: Ingress with custom domains is disabled - use external ingress management
 ingress:
   enabled: false
+```
+
+#### Staging (`values-staging.yaml`)
+```yaml
+global:
+  tag: "main"
+
+api:
+  replicaCount: 2
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+
+bff:
+  replicaCount: 2
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 4
+
+podDisruptionBudget:
+  enabled: true
 ```
 
 ### Custom Configuration
@@ -406,9 +447,16 @@ The GitHub Actions workflow (`.github/workflows/docker-build.yml`) automatically
 
 ### Triggering Deployments
 
-- **Main branch**: Deploys to production with `main` tag
-- **Develop branch**: Deploys to development with `develop` tag
+- **Main branch**: Triggers GitOps promotion workflow (staging → production) with `main` tag
 - **Tags (v*)**: Creates versioned releases
+
+### GitOps Promotion Workflow
+
+The deployment follows a GitOps promotion pattern:
+
+1. **Main Branch Push** → Triggers CI/CD pipeline
+2. **Staging Deployment** → Automatic deployment to staging environment
+3. **Production Deployment** → Automatic promotion to production after staging validation
 
 ## ArgoCD Configuration
 
@@ -424,9 +472,12 @@ The ArgoCD application (`argocd/application.yaml`) is configured with:
 ### GitOps Workflow
 
 1. Update Helm values or application code
-2. Commit changes to the repository
+2. Commit changes to the main branch
 3. ArgoCD automatically detects changes
-4. Application is synced to the cluster
+4. Applications are synced to environments in sequence:
+   - Development environment (continuous deployment)
+   - Staging environment (validation)
+   - Production environment (after staging validation)
 
 ## Monitoring and Observability
 
