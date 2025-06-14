@@ -5,8 +5,6 @@ on:
     branches:
       - develop
       - main
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
       environment:
@@ -21,6 +19,8 @@ on:
 
 env:
   REGISTRY: ghcr.io
+  # Use commit SHA for deployment tracking
+  COMMIT_SHA: ${{ github.sha }}
 
 jobs:
   # Deploy to Development Environment
@@ -73,7 +73,6 @@ jobs:
       always() && (
         (github.ref == 'refs/heads/develop' && needs.deploy-dev.outputs.deployment-status == 'success') ||
         github.ref == 'refs/heads/main' ||
-        startsWith(github.ref, 'refs/tags/v') ||
         github.event.inputs.environment == 'prod' ||
         github.event.inputs.environment == 'both'
       )
@@ -93,29 +92,27 @@ jobs:
       run: |
         if [[ "${{ github.ref }}" == "refs/heads/develop" ]]; then
           echo "trigger=auto-promotion" >> $GITHUB_OUTPUT
-          echo "Automatic promotion from successful dev deployment"
+          echo "Automatic promotion from successful dev deployment (SHA: ${{ env.COMMIT_SHA }})"
         elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
           echo "trigger=main-branch" >> $GITHUB_OUTPUT
-          echo "Direct deployment from main branch"
-        elif [[ "${{ github.ref }}" =~ ^refs/tags/v.* ]]; then
-          echo "trigger=version-tag" >> $GITHUB_OUTPUT
-          echo "Version tag deployment"
+          echo "Direct deployment from main branch (SHA: ${{ env.COMMIT_SHA }})"
         else
           echo "trigger=manual" >> $GITHUB_OUTPUT
-          echo "Manual deployment trigger"
+          echo "Manual deployment trigger (SHA: ${{ env.COMMIT_SHA }})"
         fi
 
     - name: Deploy to Production
       run: |
         echo "Triggering production deployment..."
         echo "Deployment trigger: ${{ steps.trigger.outputs.trigger }}"
+        echo "Commit SHA: ${{ env.COMMIT_SHA }}"
         echo "This will be handled by ArgoCD Image Updater watching the main branch"
         echo "Production applications will sync automatically when:"
-        echo "- New images are pushed with main/version tags"
+        echo "- New images are pushed with main branch tags or SHA tags"
         echo "- Manual sync is triggered"
         
         # In a real environment, you would:
-        # For auto-promotion from dev, trigger manual sync:
+        # For auto-promotion from dev, trigger manual sync with specific SHA:
         # if [[ "${{ steps.trigger.outputs.trigger }}" == "auto-promotion" ]]; then
         #   kubectl patch app mcp-server-dotnet -n argocd --type merge -p='{"operation":{"sync":{}}}'
         #   kubectl patch app mcp-gateway -n argocd --type merge -p='{"operation":{"sync":{}}}'
@@ -146,7 +143,8 @@ jobs:
         echo "=== Deployment Summary ==="
         echo "Development Status: ${{ needs.deploy-dev.result || 'skipped' }}"
         echo "Production Status: ${{ needs.deploy-prod.result || 'skipped' }}"
-        echo "Branch/Tag: ${{ github.ref }}"
+        echo "Branch/Ref: ${{ github.ref }}"
+        echo "Commit SHA: ${{ env.COMMIT_SHA }}"
         echo "========================="
         
         if [[ "${{ needs.deploy-dev.result }}" == "success" && "${{ needs.deploy-prod.result }}" == "success" ]]; then

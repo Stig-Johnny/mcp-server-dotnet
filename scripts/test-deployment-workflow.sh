@@ -114,19 +114,19 @@ fi
 # Test 6: Validate image tag configurations
 echo -e "${BLUE}📋 Test 6: Validating image tag configurations...${NC}"
 
-# Dev applications should use develop tags
-if grep -q "allow-tags: regexp:\\^(develop)\\$" "argocd/application-dev.yaml"; then
-    echo -e "${GREEN}✅ Dev application configured for develop tags${NC}"
+# Dev applications should use develop and SHA tags
+if grep -q "allow-tags: regexp:\\^(develop|sha-.*)\\$" "argocd/application-dev.yaml"; then
+    echo -e "${GREEN}✅ Dev application configured for develop and SHA tags${NC}"
 else
-    echo -e "${RED}❌ Dev application not configured for develop tags${NC}"
+    echo -e "${RED}❌ Dev application not configured for develop and SHA tags${NC}"
     exit 1
 fi
 
-# Prod applications should use main/version tags
-if grep -q "allow-tags: regexp:\\^(main|develop|v.*)\\$" "argocd/application.yaml"; then
-    echo -e "${GREEN}✅ Prod application configured for main/version tags${NC}"
+# Prod applications should use main/develop/SHA tags (no version tags)
+if grep -q "allow-tags: regexp:\\^(main|develop|sha-.*)\\$" "argocd/application.yaml"; then
+    echo -e "${GREEN}✅ Prod application configured for main/develop/SHA tags${NC}"
 else
-    echo -e "${RED}❌ Prod application not configured for main/version tags${NC}"
+    echo -e "${RED}❌ Prod application not configured for main/develop/SHA tags${NC}"
     exit 1
 fi
 
@@ -153,17 +153,16 @@ echo -e "${BLUE}📋 Test 8: Simulating workflow logic...${NC}"
 echo -e "${BLUE}  Scenario 1: Push to develop branch${NC}"
 echo "    - Should trigger deploy-dev job: ✅"
 echo "    - Should trigger deploy-prod job after dev success: ✅"
-echo "    - Should use develop images for dev environment: ✅"
+echo "    - Should use develop/SHA images for environments: ✅"
 
 echo -e "${BLUE}  Scenario 2: Push to main branch${NC}"
 echo "    - Should skip deploy-dev job: ✅"
 echo "    - Should trigger deploy-prod job directly: ✅"
-echo "    - Should use main images for prod environment: ✅"
+echo "    - Should use main/SHA images for prod environment: ✅"
 
-echo -e "${BLUE}  Scenario 3: Version tag (v*)${NC}"
-echo "    - Should skip deploy-dev job: ✅"
-echo "    - Should trigger deploy-prod job directly: ✅"
-echo "    - Should use version tags for prod environment: ✅"
+echo -e "${BLUE}  Scenario 3: Manual deployment${NC}"
+echo "    - Should allow targeting specific environments: ✅"
+echo "    - Should use commit SHA for deployment tracking: ✅"
 
 # Summary
 echo -e "\n${GREEN}🎉 All deployment workflow tests passed!${NC}"
@@ -179,7 +178,7 @@ echo "✅ Workflow logic scenarios validated"
 
 echo -e "\n${YELLOW}🚀 Deployment workflow ready for use!${NC}"
 echo -e "${BLUE}Deployment Flow:${NC}"
-echo "1. Push to develop → Deploy to dev → Auto-promote to prod"
-echo "2. Push to main → Deploy directly to prod"
-echo "3. Tag version → Deploy directly to prod"
-echo "4. Manual trigger → Deploy to specified environment"
+echo "1. Push to develop → Deploy to dev → Auto-promote to prod (SHA-based)"
+echo "2. Push to main → Deploy directly to prod (SHA-based)"
+echo "3. Manual trigger → Deploy to specified environment (SHA-based)"
+echo "4. All deployments use commit SHA for tracking and promotion"

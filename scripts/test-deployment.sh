@@ -71,11 +71,13 @@ echo -e "${BLUE}🔄 Validating ArgoCD configurations...${NC}"
 for app in argocd/application-gateway.yaml argocd/application.yaml argocd/application-gateway-dev.yaml argocd/application-dev.yaml; do
     if [ -f "$app" ]; then
         echo -e "${GREEN}✅ Found $app${NC}"
-        # Check for image updater annotations
-        if grep -q "argocd-image-updater.argoproj.io" "$app"; then
-            echo -e "${GREEN}✅ ArgoCD Image Updater annotations found in $app${NC}"
+        # Check for SHA-based image tagging in image updater annotations
+        if grep -q "sha-" "$app"; then
+            echo -e "${GREEN}✅ SHA-based image tagging configured in $app${NC}"
+        elif grep -q "allow-tags.*main.*develop" "$app"; then
+            echo -e "${GREEN}✅ Branch-based image tagging configured in $app${NC}"
         else
-            echo -e "${YELLOW}⚠️  No ArgoCD Image Updater annotations in $app${NC}"
+            echo -e "${YELLOW}⚠️  Image tagging strategy may need review in $app${NC}"
         fi
         
         # Check finalizer format compliance

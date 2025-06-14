@@ -11,7 +11,7 @@ metadata:
     # ArgoCD Image Updater configuration for automatic Docker image updates
     argocd-image-updater.argoproj.io/image-list: mcp-gateway=ghcr.io/stig-johnny/mcp-server-dotnet/mcp-gateway
     argocd-image-updater.argoproj.io/mcp-gateway.update-strategy: latest
-    argocd-image-updater.argoproj.io/mcp-gateway.allow-tags: regexp:^(main|develop|v.*)$
+    argocd-image-updater.argoproj.io/mcp-gateway.allow-tags: regexp:^(main|develop|sha-.*)$
     argocd-image-updater.argoproj.io/mcp-gateway.helm.image-name: gateway.image.repository
     argocd-image-updater.argoproj.io/mcp-gateway.helm.image-tag: gateway.image.tag
     argocd-image-updater.argoproj.io/mcp-gateway.pull-secret: pullsecret:argocd/ghcr-secret
