@@ -69,5 +69,23 @@ namespace McpServer.Tests
             var content = await response.Content.ReadAsStringAsync();
             Assert.Contains("MCP Server API", content);
         }
+
+        [Fact]
+        public async Task SwaggerJson_ReturnsOkInDevelopment()
+        {
+            // Arrange
+            var client = _factory.WithWebHostBuilder(builder =>
+            {
+                builder.UseEnvironment("Development");
+            }).CreateClient();
+
+            // Act
+            var response = await client.GetAsync("/swagger/v1/swagger.json");
+
+            // Assert
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var content = await response.Content.ReadAsStringAsync();
+            Assert.Contains("MCP Server API", content);
+        }
     }
 }
