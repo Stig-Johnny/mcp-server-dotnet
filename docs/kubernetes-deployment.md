@@ -32,12 +32,20 @@ The MCP Gateway is a production-optimized container that provides:
 
 ### 1. Deploy MCP Gateway with ArgoCD (Recommended)
 
+#### Prerequisites for Automatic Updates
+Ensure ArgoCD Image Updater is installed in your cluster:
+```bash
+kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj-labs/argocd-image-updater/stable/manifests/install.yaml
+```
+
+#### Deployment Steps
+
 1. Apply the ArgoCD AppProject (optional):
 ```bash
 kubectl apply -f argocd/appproject.yaml
 ```
 
-2. Deploy the MCP Gateway:
+2. Deploy the MCP Gateway with automatic image updates:
 ```bash
 kubectl apply -f argocd/application-gateway.yaml
 ```
@@ -45,6 +53,19 @@ kubectl apply -f argocd/application-gateway.yaml
 3. Deploy the full application (includes API and BFF):
 ```bash
 kubectl apply -f argocd/application.yaml
+```
+
+#### Automatic Updates
+The ArgoCD applications are configured with argocd-image-updater annotations that will:
+- ✅ Monitor GitHub Container Registry for new image tags
+- ✅ Automatically update deployments when new `main`, `develop`, or `v*` tags are pushed
+- ✅ Update Helm values files via Git commits
+- ✅ Trigger ArgoCD sync automatically
+
+#### Monitoring Updates
+Check image updater status:
+```bash
+kubectl logs -n argocd -l app.kubernetes.io/name=argocd-image-updater -f
 ```
 
 ### 2. Manual Deployment with Helm
@@ -66,6 +87,47 @@ helm install mcp-server ./helm/mcp-server-dotnet \
   --namespace mcp-server \
   --create-namespace \
   --set global.tag=main
+```
+
+### 3. Testing the Deployment
+
+Before deploying to production, validate your setup using the provided test script:
+
+```bash
+# Run comprehensive deployment tests
+./scripts/test-deployment.sh
+```
+
+This script will:
+- ✅ Validate .NET application builds
+- ✅ Run MCP Protocol compliance tests
+- ✅ Build and validate Docker containers
+- ✅ Check Helm chart configurations
+- ✅ Verify ArgoCD configurations
+- ✅ Confirm GitHub Actions workflow setup
+
+#### Manual Validation Steps
+
+1. **Check pod status**:
+```bash
+kubectl get pods -n mcp-gateway
+```
+
+2. **View logs**:
+```bash
+kubectl logs -f deployment/mcp-gateway-service -n mcp-gateway
+```
+
+3. **Test health endpoints**:
+```bash
+kubectl port-forward svc/mcp-gateway-service 8080:80 -n mcp-gateway
+curl http://localhost:8080/health
+```
+
+4. **Test MCP protocol endpoints**:
+```bash
+curl http://localhost:8080/api/mcp/tools
+curl http://localhost:8080/api/mcp/resources
 ```
 
 ## Configuration
