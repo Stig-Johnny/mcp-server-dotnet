@@ -20,7 +20,7 @@ RUN dotnet restore "src/Host/McpServer.Host/McpServer.Host.csproj"
 # Copy all source code
 COPY . .
 
-# Build the solution
+# Build the application
 WORKDIR "/src/src/Host/McpServer.Host"
 RUN dotnet build "McpServer.Host.csproj" -c Release -o /app/build
 

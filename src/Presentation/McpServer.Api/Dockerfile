@@ -5,12 +5,20 @@ EXPOSE 443
 
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
+
+# Copy project files for restore
 COPY ["src/Presentation/McpServer.Api/McpServer.Api.csproj", "src/Presentation/McpServer.Api/"]
 COPY ["src/Application/McpServer.Application/McpServer.Application.csproj", "src/Application/McpServer.Application/"]
 COPY ["src/Domain/McpServer.Domain/McpServer.Domain.csproj", "src/Domain/McpServer.Domain/"]
 COPY ["src/Infrastructure/McpServer.Infrastructure/McpServer.Infrastructure.csproj", "src/Infrastructure/McpServer.Infrastructure/"]
+
+# Restore dependencies
 RUN dotnet restore "src/Presentation/McpServer.Api/McpServer.Api.csproj"
+
+# Copy all source code
 COPY . .
+
+# Build the application
 WORKDIR "/src/src/Presentation/McpServer.Api"
 RUN dotnet build "McpServer.Api.csproj" -c Release -o /app/build
 
