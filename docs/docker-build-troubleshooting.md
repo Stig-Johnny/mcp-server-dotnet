@@ -6,40 +6,85 @@ This guide addresses common Docker build issues and their solutions for the MCP 
 
 ## Fixed Issues
 
-### 1. Node.js Installation in BFF Service
+### 1. NuGet Restore Network Connectivity Issues
+
+**Problem**: Docker builds failing with `NU1301: Unable to load the service index for source https://api.nuget.org/v3/index.json` due to network connectivity issues in CI/CD environments.
+
+**Solution**: Implemented comprehensive retry logic and improved NuGet configuration:
+
+```dockerfile
+# Configure NuGet with retry and timeout settings
+COPY ["nuget.config", "./"]
+RUN dotnet nuget locals all --clear
+
+# Restore dependencies with retry logic
+RUN dotnet restore "src/Presentation/McpServer.Api/McpServer.Api.csproj" --no-cache --force --verbosity normal || \
+    (echo "First restore failed, retrying..." && sleep 5 && dotnet restore "src/Presentation/McpServer.Api/McpServer.Api.csproj" --no-cache --force --verbosity normal) || \
+    (echo "Second restore failed, retrying..." && sleep 10 && dotnet restore "src/Presentation/McpServer.Api/McpServer.Api.csproj" --no-cache --force --verbosity normal)
+```
+
+**NuGet Configuration Improvements**:
+- Added custom `nuget.config` with optimized settings
+- Configured global packages folder for better caching
+- Clear package sources to avoid conflicts
+- Added proxy configuration support
+
+### 2. Node.js Installation in BFF Service
 
 **Problem**: The BFF service Docker build was failing due to Node.js installation issues using the deprecated setup script method.
 
-**Solution**: Updated the BFF Dockerfile to use the official Node.js APT repository method with proper certificate handling:
+**Solution**: Updated the BFF Dockerfile to use the official Node.js APT repository method with improved error handling:
 
 ```dockerfile
-# Install Node.js 20 LTS using Node.js official distribution
+# Install Node.js 20 LTS using Node.js official distribution with improved error handling
 RUN apt-get update && apt-get install -y ca-certificates curl gnupg \
     && mkdir -p /etc/apt/keyrings \
-    && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
+    && for i in 1 2 3; do \
+        curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
+        && break || sleep 5; \
+    done \
     && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list \
     && apt-get update && apt-get install -y nodejs \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Verify Node.js installation
+RUN node --version && npm --version
 ```
 
-### 2. Docker Layer Optimization
+### 3. NPM Dependencies Installation
 
-**Problem**: Inefficient Docker layer caching due to poor instruction ordering.
+**Problem**: NPM installation failures due to network issues or dependency conflicts.
 
-**Solution**: Reorganized Docker instructions for better layer caching:
-- Install system dependencies first
-- Copy package files before copying source code
-- Install npm dependencies before building React app
-- Improved consistency across all Dockerfiles
+**Solution**: Added retry logic for npm operations:
 
-### 3. Missing npm Dependencies
+```dockerfile
+# Install npm dependencies with retry logic
+RUN npm ci --production=false --no-audit --no-fund || \
+    (echo "First npm install failed, retrying..." && sleep 5 && npm ci --production=false --no-audit --no-fund) || \
+    (echo "Second npm install failed, retrying..." && sleep 10 && npm ci --production=false --no-audit --no-fund)
+```
 
-**Problem**: The local build was failing because npm dependencies were not installed for the React frontend.
+### 4. GitHub Actions Docker Build Optimization
 
-**Solution**: 
-- Installed npm dependencies locally using `npm ci`
-- Updated the BFF project structure to handle npm dependencies properly in Docker builds
-- Added proper layering in Dockerfile to cache npm dependencies
+**Problem**: Docker builds timing out or failing in CI/CD environment.
+
+**Solution**: Enhanced GitHub Actions workflow with:
+
+```yaml
+- name: Build and push API Docker image
+  uses: docker/build-push-action@v5
+  with:
+    context: .
+    file: ./src/Presentation/McpServer.Api/Dockerfile
+    push: true
+    tags: ${{ steps.meta-api.outputs.tags }}
+    labels: ${{ steps.meta-api.outputs.labels }}
+    cache-from: type=gha
+    cache-to: type=gha,mode=max
+    platforms: linux/amd64
+    build-args: |
+      BUILDKIT_INLINE_CACHE=1
+```
 
 ## Build Verification
 
@@ -48,13 +93,15 @@ RUN apt-get update && apt-get install -y ca-certificates curl gnupg \
 - ✅ All tests pass (12/12)
 - ✅ React frontend builds correctly
 - ✅ Health check endpoints work
+- ✅ Docker builds include retry mechanisms
 
 ### Docker Build Status
 The Docker builds have been improved to handle:
-- Proper Node.js installation
-- Better layer caching
-- Consistent project structure across services
-- Robust dependency installation
+- ✅ Network connectivity issues with automatic retries
+- ✅ Proper Node.js installation with error handling
+- ✅ Better layer caching for faster builds
+- ✅ Consistent project structure across services
+- ✅ Robust dependency installation for both .NET and npm
 
 ## Common Issues and Solutions
 
@@ -65,20 +112,32 @@ If you encounter network connectivity issues during Docker builds:
 1. **SSL Certificate Issues**: Ensure proper CA certificates are installed
 2. **Proxy Settings**: Configure Docker to use corporate proxies if needed
 3. **DNS Resolution**: Verify DNS resolution is working in build environment
+4. **NuGet Service Availability**: Check if NuGet.org is accessible
 
-### NuGet Restore Issues
+### Manual Recovery Steps
 
-If NuGet restore fails:
+If builds continue to fail:
 
-1. **Check Network Access**: Ensure access to `https://api.nuget.org/v3/index.json`
-2. **Authentication**: Verify NuGet authentication if using private feeds
-3. **Retry Logic**: Add retry logic for transient network failures
+1. **Clear Docker Build Cache**:
+   ```bash
+   docker builder prune --all
+   ```
+
+2. **Build with No Cache**:
+   ```bash
+   docker build --no-cache -f ./src/Presentation/McpServer.Api/Dockerfile -t mcp-server-api .
+   ```
+
+3. **Test Network Connectivity**:
+   ```bash
+   curl -I https://api.nuget.org/v3/index.json
+   ```
 
 ### React Build Issues
 
 If React builds fail:
 
-1. **Node.js Version**: Ensure Node.js 18+ is installed
+1. **Node.js Version**: Ensure Node.js 20+ is installed
 2. **Memory Issues**: Consider increasing Docker memory limits for large React builds
 3. **Dependencies**: Verify all npm dependencies are properly installed
 
@@ -90,31 +149,34 @@ If React builds fail:
 2. **Layer Caching**: Order instructions from least to most frequently changing
 3. **Dependency Installation**: Install dependencies before copying source code
 4. **Clean Up**: Remove unnecessary files and packages in same RUN instruction
+5. **Retry Logic**: Implement retry mechanisms for network operations
 
 ### CI/CD Integration
 
 1. **Build Cache**: Use GitHub Actions cache for Docker layers
-2. **Parallel Builds**: Build multiple services in parallel when possible
+2. **Platform Specification**: Specify target platform to avoid cross-platform issues
 3. **Error Handling**: Implement proper error handling and retry logic
 4. **Security**: Use minimal base images and scan for vulnerabilities
 
-## Monitoring and Debugging
+## Environment-Specific Solutions
 
-### Build Logs
-- Enable verbose logging for troubleshooting
-- Monitor build times and layer sizes
-- Check for security vulnerabilities
+### Development Environment
+```bash
+# Build locally with debug output
+docker build --progress=plain -f ./src/Presentation/McpServer.Api/Dockerfile -t mcp-server-api .
+```
 
-### Testing
-- Test builds in multiple environments
-- Verify functionality with integration tests
-- Monitor resource usage during builds
+### CI/CD Environment
+- GitHub Actions include automatic retry for transient failures
+- Build cache optimized for GitHub Actions runners
+- Comprehensive error logging and debugging information
 
 ## Support
 
 For additional Docker build issues:
 
-1. Check the GitHub Actions workflow logs
-2. Verify Docker version compatibility
-3. Test builds locally before pushing
-4. Consider using Docker Buildx for advanced features
+1. Check the GitHub Actions workflow logs for specific error details
+2. Verify network connectivity in your environment
+3. Test builds locally to isolate CI-specific issues
+4. Review recent changes to dependency versions
+5. Check Docker version compatibility
