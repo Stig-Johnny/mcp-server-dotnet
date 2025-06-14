@@ -1,6 +1,6 @@
 # MCP Server .NET - Kubernetes Deployment Guide
 
-This guide provides instructions for deploying the MCP Server .NET Aspire application to a Kubernetes cluster using ArgoCD and Helm.
+This guide provides instructions for deploying the MCP Server .NET application to a Kubernetes cluster using ArgoCD and Helm, with a focus on the MCP Gateway for protocol compliance.
 
 ## Prerequisites
 
@@ -14,33 +14,53 @@ This guide provides instructions for deploying the MCP Server .NET Aspire applic
 
 The deployment consists of:
 
-- **API Service**: MCP Server API (`McpServer.Api`)
+- **MCP Gateway**: Primary service for Model Context Protocol compliance (`mcp-gateway`)
+- **API Service**: Legacy MCP Server API (`McpServer.Api`)
 - **BFF Service**: Backend-for-Frontend with React frontend (`McpServer.Bff`)
 - **Host Service**: Aspire Host (optional, mainly for development)
 
+### MCP Gateway Features
+
+The MCP Gateway is a production-optimized container that provides:
+- Full MCP protocol compliance
+- High availability with autoscaling
+- Enhanced security with non-root user
+- Protocol testing and validation endpoints
+- Comprehensive health checks
+
 ## Quick Start
 
-### 1. Deploy with ArgoCD
+### 1. Deploy MCP Gateway with ArgoCD (Recommended)
 
 1. Apply the ArgoCD AppProject (optional):
 ```bash
 kubectl apply -f argocd/appproject.yaml
 ```
 
-2. Deploy the application:
+2. Deploy the MCP Gateway:
+```bash
+kubectl apply -f argocd/application-gateway.yaml
+```
+
+3. Deploy the full application (includes API and BFF):
 ```bash
 kubectl apply -f argocd/application.yaml
 ```
 
 ### 2. Manual Deployment with Helm
 
-1. Add the repository (if using a Helm repository):
+#### Deploy MCP Gateway Only
+
 ```bash
-helm repo add mcp-server https://your-helm-repo.com
-helm repo update
+helm install mcp-gateway ./helm/mcp-server-dotnet \
+  --namespace mcp-gateway \
+  --create-namespace \
+  --values helm/mcp-server-dotnet/values-gateway.yaml \
+  --set global.tag=main
 ```
 
-2. Install the chart:
+#### Deploy Full Application
+
 ```bash
 helm install mcp-server ./helm/mcp-server-dotnet \
   --namespace mcp-server \

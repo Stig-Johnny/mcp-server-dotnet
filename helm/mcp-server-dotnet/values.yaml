@@ -8,6 +8,69 @@ global:
   tag: "main"
   pullPolicy: IfNotPresent
 
+# MCP Gateway Configuration (Primary service for protocol compliance)
+gateway:
+  enabled: true
+  replicaCount: 3
+  image:
+    repository: "" # Will be set to global.registry/global.repository/mcp-gateway
+    tag: ""        # Will use global.tag if not set
+    pullPolicy: ""  # Will use global.pullPolicy if not set
+  
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 8080
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-type: nlb
+  
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+  
+  env:
+    - name: ASPNETCORE_ENVIRONMENT
+      value: "Production"
+    - name: ASPNETCORE_URLS
+      value: "http://+:8080"
+    - name: MCP_GATEWAY_MODE
+      value: "true"
+  
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 8080
+    initialDelaySeconds: 30
+    periodSeconds: 15
+    timeoutSeconds: 10
+    failureThreshold: 3
+  
+  readinessProbe:
+    httpGet:
+      path: /health/ready
+      port: 8080
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 2
+
+  # Gateway-specific autoscaling
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 20
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+  # Gateway Pod Disruption Budget
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 2
+
 # API Service Configuration
 api:
   enabled: true
@@ -130,21 +193,40 @@ ingress:
     nginx.ingress.kubernetes.io/rewrite-target: /
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
   hosts:
-    - host: mcp-server.local
+    - host: mcp-gateway.local
       paths:
+        # MCP Protocol endpoints - route to dedicated gateway
+        - path: /api/mcp
+          pathType: Prefix
+          backend:
+            service: gateway
+        # Health checks for gateway
+        - path: /health
+          pathType: Prefix
+          backend:
+            service: gateway
+        # Swagger/API documentation
+        - path: /swagger
+          pathType: Prefix
+          backend:
+            service: gateway
+        # Legacy API routes - route to API service
         - path: /api
           pathType: Prefix
           backend:
             service: api
+        # Frontend - route to BFF service
         - path: /
           pathType: Prefix
           backend:
             service: bff
   tls:
-    - secretName: mcp-server-tls
+    - secretName: mcp-gateway-tls
       hosts:
-        - mcp-server.local
+        - mcp-gateway.local
 
 # Service Account
 serviceAccount:

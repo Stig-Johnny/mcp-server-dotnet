@@ -1,0 +1,184 @@
+# MCP Gateway-focused deployment values
+# This configuration prioritizes the gateway service for MCP protocol compliance
+
+global:
+  registry: ghcr.io
+  repository: stig-johnny/mcp-server-dotnet
+  tag: "main"
+  pullPolicy: IfNotPresent
+
+# MCP Gateway Configuration (Primary service)
+gateway:
+  enabled: true
+  replicaCount: 3
+  
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 8080
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-type: nlb
+  
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 500m
+      memory: 512Mi
+  
+  env:
+    - name: ASPNETCORE_ENVIRONMENT
+      value: "Production"
+    - name: ASPNETCORE_URLS
+      value: "http://+:8080"
+    - name: MCP_GATEWAY_MODE
+      value: "true"
+  
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 8080
+    initialDelaySeconds: 30
+    periodSeconds: 15
+    timeoutSeconds: 10
+    failureThreshold: 3
+  
+  readinessProbe:
+    httpGet:
+      path: /health/ready
+      port: 8080
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 2
+
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 20
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 2
+
+# API Service Configuration (Legacy/Admin)
+api:
+  enabled: true
+  replicaCount: 1
+  
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+
+# BFF Service Configuration (Optional)
+bff:
+  enabled: false  # Disable BFF for gateway-focused deployments
+
+# Host Service Configuration (Development only)
+host:
+  enabled: false
+
+# Ingress Configuration - Gateway-focused
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/rate-limit: "200"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+  hosts:
+    - host: mcp-gateway.local
+      paths:
+        # MCP Protocol endpoints - primary gateway
+        - path: /api/mcp
+          pathType: Prefix
+          backend:
+            service: gateway
+        # Health checks
+        - path: /health
+          pathType: Prefix
+          backend:
+            service: gateway
+        # API documentation
+        - path: /swagger
+          pathType: Prefix
+          backend:
+            service: gateway
+        # Legacy API routes
+        - path: /api
+          pathType: Prefix
+          backend:
+            service: api
+  tls:
+    - secretName: mcp-gateway-tls
+      hosts:
+        - mcp-gateway.local
+
+# Security and governance
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podSecurityContext:
+  fsGroup: 2000
+  runAsNonRoot: true
+  runAsUser: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+
+# Monitoring
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    path: /metrics
+
+# General autoscaling (overridden by gateway-specific)
+autoscaling:
+  enabled: false
+
+# Pod Disruption Budget (overridden by gateway-specific)
+podDisruptionBudget:
+  enabled: false
+
+# Network Policy
+networkPolicy:
+  enabled: true
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+  egress:
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443

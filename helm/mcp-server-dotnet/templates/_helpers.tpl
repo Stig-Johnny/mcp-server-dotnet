@@ -110,6 +110,31 @@ app.kubernetes.io/component: host
 {{- end }}
 
 {{/*
+Gateway Labels
+*/}}
+{{- define "mcp-server-dotnet.gateway.labels" -}}
+{{ include "mcp-server-dotnet.labels" . }}
+app.kubernetes.io/component: gateway
+{{- end }}
+
+{{/*
+Gateway Selector Labels
+*/}}
+{{- define "mcp-server-dotnet.gateway.selectorLabels" -}}
+{{ include "mcp-server-dotnet.selectorLabels" . }}
+app.kubernetes.io/component: gateway
+{{- end }}
+
+{{/*
+Image helper for Gateway
+*/}}
+{{- define "mcp-server-dotnet.gateway.image" -}}
+{{- $repository := .Values.gateway.image.repository | default (printf "%s/%s/mcp-gateway" .Values.global.registry .Values.global.repository) }}
+{{- $tag := .Values.gateway.image.tag | default .Values.global.tag | default .Chart.AppVersion }}
+{{- printf "%s:%s" $repository $tag }}
+{{- end }}
+
+{{/*
 Image helper for API
 */}}
 {{- define "mcp-server-dotnet.api.image" -}}
