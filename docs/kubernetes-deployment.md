@@ -140,6 +140,40 @@ curl http://localhost:8080/api/mcp/resources
 
 The MCP Server .NET application uses different hostnames for different deployment scenarios. Understanding these hostnames is crucial for proper DNS setup and ingress configuration.
 
+#### Components and Architecture
+
+The MCP Server .NET deployment includes the following components:
+
+**Complete Stack (MVP Server)**:
+- **MCP Gateway**: Protocol-compliant MCP server with enhanced features
+- **API Service**: Core MCP Server API (`McpServer.Api`)
+- **BFF Service**: Backend-for-Frontend with React application (`McpServer.Bff`)
+
+**Gateway-Only Deployment**:
+- **MCP Gateway**: Standalone protocol-compliant server for production MCP operations
+
+#### Internal Kubernetes Service URLs
+
+When deployed with the default setup, the following internal Kubernetes service names are created:
+
+**Full Stack Deployment** (namespace: `mcp-server`):
+```
+mcp-server-dotnet-gateway.mcp-server.svc.cluster.local:80
+mcp-server-dotnet-api.mcp-server.svc.cluster.local:80
+mcp-server-dotnet-bff.mcp-server.svc.cluster.local:80
+```
+
+**Gateway-Only Deployment** (namespace: `mcp-gateway`):
+```
+mcp-gateway-gateway.mcp-gateway.svc.cluster.local:80
+```
+
+> **💡 Internal Routing**: Use these service URLs for:
+> - Custom Ingress controller configurations
+> - Service mesh routing (Istio, Linkerd)
+> - Internal service-to-service communication
+> - Load balancer backend pool configurations
+
 #### Hostname Overview
 
 | Environment | Hostname | Purpose | Routes |
@@ -217,11 +251,11 @@ Cloudflare Tunnels provide secure access without exposing your cluster directly 
    
    ingress:
      - hostname: mcp-server.yourdomain.com
-       service: http://mcp-server-service.mcp-server.svc.cluster.local:80
+       service: http://mcp-server-dotnet-bff.mcp-server.svc.cluster.local:80
      - hostname: mcp-server-dev.yourdomain.com  
-       service: http://mcp-server-service.mcp-server-dev.svc.cluster.local:80
+       service: http://mcp-server-dotnet-bff.mcp-server.svc.cluster.local:80
      - hostname: mcp-gateway.yourdomain.com
-       service: http://mcp-gateway-service.mcp-gateway.svc.cluster.local:80
+       service: http://mcp-gateway-gateway.mcp-gateway.svc.cluster.local:80
      - service: http_status:404
    EOF
    ```
@@ -282,8 +316,8 @@ For local testing without DNS setup:
 
 ```bash
 # Forward services to localhost
-kubectl port-forward svc/mcp-server-service 8080:80 -n mcp-server
-kubectl port-forward svc/mcp-gateway-service 8081:80 -n mcp-gateway
+kubectl port-forward svc/mcp-server-dotnet-bff 8080:80 -n mcp-server
+kubectl port-forward svc/mcp-gateway-gateway 8081:80 -n mcp-gateway
 
 # Access via localhost
 curl http://localhost:8080/api/mcp/tools
