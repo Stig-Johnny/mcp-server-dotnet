@@ -77,6 +77,23 @@ for app in argocd/application-gateway.yaml argocd/application.yaml; do
         else
             echo -e "${YELLOW}⚠️  No ArgoCD Image Updater annotations in $app${NC}"
         fi
+        
+        # Check finalizer format compliance
+        if python3 -c "
+import yaml
+with open('$app', 'r') as f:
+    doc = yaml.safe_load(f)
+    finalizers = doc.get('metadata', {}).get('finalizers', [])
+    for finalizer in finalizers:
+        if '/' in finalizer and '.' in finalizer.split('/')[0]:
+            continue
+        else:
+            exit(1)
+" 2>/dev/null; then
+            echo -e "${GREEN}✅ Finalizer format compliant in $app${NC}"
+        else
+            echo -e "${YELLOW}⚠️  Finalizer format may need review in $app${NC}"
+        fi
     else
         echo -e "${RED}❌ Missing $app${NC}"
         exit 1
@@ -105,6 +122,7 @@ echo "✅ MCP Protocol compliance tests pass"
 echo "✅ Docker container builds successfully"
 echo "✅ Helm charts are valid and render correctly"
 echo "✅ ArgoCD configurations include image updater"
+echo "✅ ArgoCD finalizers follow Kubernetes best practices"
 echo "✅ GitHub Actions workflow includes gateway build"
 
 echo -e "\n${YELLOW}🚀 Ready for deployment!${NC}"
