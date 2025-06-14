@@ -152,7 +152,13 @@ The MCP Server .NET deployment includes the following components:
 **Gateway-Only Deployment**:
 - **MCP Gateway**: Standalone protocol-compliant server for production MCP operations
 
-#### Internal Kubernetes Service URLs
+#### Service Access
+
+**Important**: As of the latest version, ingress resources with custom domains have been removed from the Helm charts and are expected to be managed by external software (external ingress controllers, service mesh, or load balancers).
+
+The application services are accessible through:
+
+##### Internal Kubernetes Service URLs
 
 When deployed with the default setup, the following internal Kubernetes service names are created:
 
@@ -168,71 +174,37 @@ mcp-server-dotnet-bff.mcp-server.svc.cluster.local:80
 mcp-gateway-gateway.mcp-gateway.svc.cluster.local:80
 ```
 
-> **💡 Internal Routing**: Use these service URLs for:
-> - Custom Ingress controller configurations
-> - Service mesh routing (Istio, Linkerd)
-> - Internal service-to-service communication
-> - Load balancer backend pool configurations
+> **💡 Service Access Options**: Access services via:
+> - **Port forwarding**: `kubectl port-forward svc/service-name 8080:80`
+> - **External ingress controllers**: Configure your external ingress to route to these services
+> - **Service mesh**: Use Istio, Linkerd, or other service mesh for routing
+> - **Load balancers**: Configure external load balancers to target these services
+> - **Custom ingress**: Enable ingress in values files and configure without custom domains
 
-#### Hostname Overview
+##### Access Methods
 
-| Environment | Hostname | Purpose | Routes |
-|-------------|----------|---------|--------|
-| **Development** | `mcp-server-dev.yourdomain.com` | Development testing and staging | `/api` → API service<br>`/` → BFF service |
-| **Production** | `mcp-server.yourdomain.com` | Production deployment | `/api` → API service<br>`/` → BFF service |
-| **Gateway** | `mcp-gateway.local` | MCP protocol compliance | `/api/mcp` → Gateway service<br>`/health` → Gateway service<br>`/swagger` → Gateway service<br>`/api` → API service |
-
-#### Hostname Purposes
-
-- **Development/Production hostnames** (`mcp-server-dev.yourdomain.com`, `mcp-server.yourdomain.com`):
-  - Full application deployment with both API and BFF (Backend-for-Frontend) services
-  - BFF serves the React frontend application
-  - API provides the core MCP server functionality
-  - Suitable for complete application testing and production use
-
-- **Gateway hostname** (`mcp-gateway.local`):
-  - Focused on MCP protocol compliance
-  - Optimized for production MCP protocol operations
-  - Direct access to MCP endpoints without frontend overhead
-  - Includes health checks and API documentation routes
-
-#### Setting Up Hostnames
-
-##### Option 1: Kubernetes Ingress with DNS
-
-1. **Configure your DNS provider** to point hostnames to your Kubernetes cluster's ingress controller:
+1. **Port Forwarding (Development)**:
    ```bash
-   # Example DNS A records
-   mcp-server.yourdomain.com        → <ingress-controller-ip>
-   mcp-server-dev.yourdomain.com    → <ingress-controller-ip>
-   mcp-gateway.local                → <ingress-controller-ip>
+   # Access Gateway service
+   kubectl port-forward svc/mcp-server-dotnet-gateway 8080:80 -n mcp-server
+   
+   # Access API service  
+   kubectl port-forward svc/mcp-server-dotnet-api 8080:80 -n mcp-server
+   
+   # Access BFF service
+   kubectl port-forward svc/mcp-server-dotnet-bff 8080:80 -n mcp-server
    ```
 
-2. **Update Helm values** with your actual domain:
-   ```yaml
-   # values-prod.yaml
-   ingress:
-     hosts:
-       - host: mcp-server.yourdomain.com  # Replace with your domain
-   
-   # values-dev.yaml
-   ingress:
-     hosts:  
-       - host: mcp-server-dev.yourdomain.com  # Replace with your domain
-   
-   # values-gateway.yaml
-   ingress:
-     hosts:
-       - host: mcp-gateway.yourdomain.com  # Replace with your domain if needed
-   ```
+2. **External Ingress Management**:
+   Configure your external ingress controller to route traffic to the internal service endpoints listed above.
 
-3. **Configure TLS certificates** (recommended for production):
+3. **Custom Ingress Configuration**:
+   If you need to enable ingress within the Helm chart (without custom domains), set:
    ```yaml
    ingress:
-     tls:
-       - secretName: mcp-server-tls
-         hosts:
-           - mcp-server.yourdomain.com
+     enabled: true
+     # Configure hosts and paths as needed for your environment
+     # without using custom domains like *.yourdomain.com
    ```
 
 ##### Option 2: Cloudflare Tunnels
@@ -326,19 +298,21 @@ curl http://localhost:8081/api/mcp/tools
 
 #### Verification
 
-After setting up hostnames, verify your configuration:
+After setting up external ingress management (e.g., Cloudflare Tunnels), verify your configuration:
 
 ```bash
-# Test hostname resolution
-nslookup mcp-server.yourdomain.com
-nslookup mcp-server-dev.yourdomain.com
+# Test service accessibility via port forwarding (for internal testing)
+kubectl port-forward svc/mcp-server-dotnet-gateway 8080:80 -n mcp-server
+curl http://localhost:8080/health
 
-# Test HTTP endpoints
-curl -k https://mcp-server.yourdomain.com/health
-curl -k https://mcp-gateway.yourdomain.com/health
+# Test external access (if using Cloudflare Tunnels or external ingress)
+curl -k https://your-configured-domain.com/health
 
 # Verify MCP protocol endpoints
-curl -k https://mcp-gateway.yourdomain.com/api/mcp/tools
+curl -k https://your-configured-domain.com/api/mcp/tools
+
+# Check internal service connectivity
+kubectl exec -n mcp-server deployment/mcp-server-dotnet-api -- curl http://mcp-server-dotnet-gateway:80/health
 ```
 
 ### Environment-specific Values
@@ -370,22 +344,9 @@ bff:
       cpu: 1000m
       memory: 1Gi
 
+# Note: Ingress with custom domains is disabled - use external ingress management
 ingress:
-  hosts:
-    - host: mcp-server.yourdomain.com
-      paths:
-        - path: /api
-          pathType: Prefix
-          backend:
-            service: api
-        - path: /
-          pathType: Prefix
-          backend:
-            service: bff
-  tls:
-    - secretName: mcp-server-tls
-      hosts:
-        - mcp-server.yourdomain.com
+  enabled: false
 
 autoscaling:
   enabled: true
@@ -412,9 +373,9 @@ bff:
       cpu: 100m
       memory: 128Mi
 
+# Note: Ingress with custom domains is disabled - use external ingress management
 ingress:
-  hosts:
-    - host: mcp-server-dev.yourdomain.com
+  enabled: false
 ```
 
 ### Custom Configuration
