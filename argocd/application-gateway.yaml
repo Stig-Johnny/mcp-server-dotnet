@@ -68,4 +68,4 @@ spec:
     - name: Environment
       value: Production
     - name: Documentation
-      value: https://github.com/Stig-Johnny/mcp-server-dotnet/blob/main/docs/kubernetes-deployment.md
+      value: https://github.com/Stig-Johnny/mcp-server-dotnet/blob/main/docs/argocd-deployment.md

@@ -2,6 +2,8 @@
 
 This guide provides instructions for deploying the MCP Server .NET application to a Kubernetes cluster using ArgoCD and Helm, with a focus on the MCP Gateway for protocol compliance.
 
+> 📖 **For comprehensive ArgoCD automation**: See the detailed [**ArgoCD Deployment Guide**](argocd-deployment.md) for complete application manifest creation, sync policies configuration, and status verification procedures.
+
 ## Prerequisites
 
 - Kubernetes cluster (1.19+)
@@ -31,6 +33,8 @@ The MCP Gateway is a production-optimized container that provides:
 ## Quick Start
 
 ### 1. Deploy MCP Gateway with ArgoCD (Recommended)
+
+> 📖 **Comprehensive ArgoCD Guide**: For detailed ArgoCD deployment automation, including application manifest creation, sync policies configuration, and status verification, see the [**ArgoCD Deployment Guide**](argocd-deployment.md).
 
 #### Prerequisites for Automatic Updates
 Ensure ArgoCD Image Updater is installed in your cluster:
