@@ -123,15 +123,30 @@ jobs:
         cache-to: type=gha,mode=max
         platforms: linux/amd64
 
-    # Build and push BFF Docker image
-    - name: Build and push BFF Docker image
+    # Extract metadata for Gateway
+    - name: Extract metadata for Gateway
+      id: meta-gateway
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ github.repository }}/mcp-gateway
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=sha
+        flavor: |
+          latest=auto
+
+    # Build and push Gateway Docker image
+    - name: Build and push Gateway Docker image
       uses: docker/build-push-action@v5
       with:
         context: .
-        file: ./src/Presentation/McpServer.Bff/Dockerfile
+        file: ./Dockerfile.gateway
         push: ${{ github.event_name != 'pull_request' }}
-        tags: ${{ steps.meta-bff.outputs.tags }}
-        labels: ${{ steps.meta-bff.outputs.labels }}
+        tags: ${{ steps.meta-gateway.outputs.tags }}
+        labels: ${{ steps.meta-gateway.outputs.labels }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
         platforms: linux/amd64

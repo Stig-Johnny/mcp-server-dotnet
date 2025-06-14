@@ -1,0 +1,36 @@
+# Production-optimized Dockerfile for MCP Gateway
+# Uses pre-built binaries similar to existing workflow
+
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+
+# Create non-root user for security
+RUN addgroup --system --gid 1000 mcpgateway \
+    && adduser --system --uid 1000 --gid 1000 --shell /bin/false mcpgateway
+
+# Set working directory
+WORKDIR /app
+
+# Copy published application (from local build or CI)
+COPY ["publish/api", "./"]
+
+# Create directory for temporary files with proper permissions
+RUN mkdir -p /app/tmp && chown -R mcpgateway:mcpgateway /app
+
+# Switch to non-root user
+USER mcpgateway
+
+# Configure ASP.NET Core for production
+ENV ASPNETCORE_ENVIRONMENT=Production
+ENV ASPNETCORE_URLS=http://+:8080
+ENV DOTNET_RUNNING_IN_CONTAINER=true
+ENV DOTNET_USE_POLLING_FILE_WATCHER=true
+
+# Expose port
+EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+# Entry point
+ENTRYPOINT ["dotnet", "McpServer.Api.dll"]
