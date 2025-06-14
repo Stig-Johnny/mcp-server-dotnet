@@ -1,0 +1,69 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: github-runners
+  annotations:
+    config.kubernetes.io/local-config: "true"
+
+namespace: github-runners
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - rbac.yaml
+  - runner-deployment.yaml
+
+# Common labels applied to all resources
+commonLabels:
+  app.kubernetes.io/name: github-runners
+  app.kubernetes.io/part-of: mcp-server-dotnet
+  app.kubernetes.io/component: ci-cd
+  app.kubernetes.io/managed-by: argocd
+
+# Images to update (for image updater integration)
+images:
+  - name: summerwind/actions-runner
+    newTag: latest
+
+# ConfigMap generator for runtime configuration
+configMapGenerator:
+  - name: github-runner-config
+    literals:
+      - RUNNER_SCOPE=repo
+      - RUNNER_LABELS=self-hosted,kubernetes,mcp-server-dotnet
+      - RUNNER_GROUP=mcp-server-runners
+      - DOCKER_ENABLED=true
+      - DOCKERD_IN_RUNNER=true
+      - LOG_LEVEL=info
+      - EPHEMERAL=false
+    options:
+      disableNameSuffixHash: true
+
+# Patches for different environments
+patchesStrategicMerge: []
+  # - patches/production.yaml
+  # - patches/development.yaml
+
+# JSON patches for fine-grained modifications
+patches: []
+  # - target:
+  #     kind: RunnerDeployment
+  #     name: mcp-server-dotnet-runners
+  #   patch: |-
+  #     - op: replace
+  #       path: /spec/replicas
+  #       value: 3
+
+# Replacements for cross-cutting configuration
+replacements: []
+  # - source:
+  #     kind: ConfigMap
+  #     name: github-runner-config
+  #     fieldPath: data.RUNNER_LABELS
+  #   targets:
+  #     - select:
+  #         kind: RunnerDeployment
+  #         name: mcp-server-dotnet-runners
+  #       fieldPaths:
+  #         - spec.template.spec.labels

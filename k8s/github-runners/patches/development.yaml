@@ -1,0 +1,38 @@
+# Development environment patches for GitHub Actions runners
+apiVersion: actions.summerwind.dev/v1alpha1
+kind: RunnerDeployment
+metadata:
+  name: mcp-server-dotnet-runners
+  namespace: github-runners
+spec:
+  # Fewer replicas for development
+  replicas: 1
+  
+  template:
+    spec:
+      # Development-specific labels
+      labels:
+        - self-hosted
+        - kubernetes
+        - mcp-server-dotnet
+        - development
+        - linux
+        - x64
+      
+      # Reduced resources for development
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          cpu: "1"
+          memory: 2Gi
+      
+      # Development-specific environment variables
+      env:
+      - name: RUNNER_LABELS
+        value: "self-hosted,kubernetes,mcp-server-dotnet,development"
+      - name: ENVIRONMENT
+        value: "development"
+      - name: LOG_LEVEL
+        value: "debug"

@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: github-runner-config
+  namespace: github-runners
+  labels:
+    app.kubernetes.io/name: github-runner-config
+    app.kubernetes.io/part-of: mcp-server-dotnet
+data:
+  # Runner configuration
+  RUNNER_SCOPE: "repo"
+  RUNNER_LABELS: "self-hosted,kubernetes,mcp-server-dotnet"
+  RUNNER_GROUP: "mcp-server-runners"
+  # Docker configuration
+  DOCKER_ENABLED: "true"
+  DOCKERD_IN_RUNNER: "true"
+  # Resource limits
+  RUNNER_REQUESTS_CPU: "100m"
+  RUNNER_REQUESTS_MEMORY: "128Mi"
+  RUNNER_LIMITS_CPU: "2000m"
+  RUNNER_LIMITS_MEMORY: "4Gi"
+  # Logging
+  LOG_LEVEL: "info"
+  # Cleanup
+  DISABLE_RUNNER_UPDATE: "false"
+  EPHEMERAL: "false"

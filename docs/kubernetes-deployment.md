@@ -12,6 +12,8 @@ This guide provides instructions for deploying the MCP Server .NET application t
 - kubectl configured to access your cluster
 - Container registry access (GitHub Container Registry is used by default)
 
+> 🏃‍♂️ **Self-Hosted Runners**: For enhanced CI/CD performance with dedicated GitHub Actions runners in your Kubernetes cluster, see the [**GitHub Actions Runners Setup Guide**](github-runners-setup.md).
+
 ## Architecture Overview
 
 The deployment consists of:

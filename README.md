@@ -226,6 +226,28 @@ helm install mcp-server ./helm/mcp-server-dotnet \
 
 For detailed Kubernetes deployment instructions, see [Kubernetes Deployment Guide](docs/kubernetes-deployment.md).
 
+#### Self-Hosted CI/CD Runners
+
+For enhanced CI/CD performance, deploy dedicated GitHub Actions runners in your Kubernetes cluster:
+
+```bash
+# Set up self-hosted runners
+./scripts/setup-github-runners.sh install-controller
+./scripts/setup-github-runners.sh create-secret <your-github-pat>
+./scripts/setup-github-runners.sh deploy prod
+
+# Verify deployment
+./scripts/setup-github-runners.sh status
+```
+
+The self-hosted runners provide:
+- **Enhanced Performance**: Dedicated resources for builds and tests
+- **Custom Environment**: Pre-configured with required tools and dependencies
+- **Cost Optimization**: Better resource utilization for intensive workloads
+- **Security**: Isolated runners within your infrastructure
+
+For detailed setup instructions, see [GitHub Actions Runners Setup Guide](docs/github-runners-setup.md).
+
 #### Docker Container
 
 Deploy as a Docker container or directly to Azure App Service, AWS, or any .NET-compatible hosting platform.

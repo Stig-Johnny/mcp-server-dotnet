@@ -1,0 +1,42 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: github-runners
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: github-runners
+    app.kubernetes.io/part-of: mcp-server-dotnet
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io/resource
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Stig-Johnny/mcp-server-dotnet.git
+    targetRevision: main
+    path: k8s
+    directory:
+      recurse: true
+      include: |
+        github-runners/*.yaml
+        monitoring/service-monitor.yaml
+        monitoring/grafana-dashboard.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: github-runners
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+  revisionHistoryLimit: 10

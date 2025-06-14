@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: github-runner
+  namespace: github-runners
+  labels:
+    app.kubernetes.io/name: github-runner
+    app.kubernetes.io/part-of: mcp-server-dotnet
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: github-runner
+  namespace: github-runners
+  labels:
+    app.kubernetes.io/name: github-runner
+    app.kubernetes.io/part-of: mcp-server-dotnet
+rules:
+# Allow runners to read secrets for workflow access
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list"]
+# Allow runners to read configmaps
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list"]
+# Allow runners to read pods (for debugging)
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: github-runner
+  namespace: github-runners
+  labels:
+    app.kubernetes.io/name: github-runner
+    app.kubernetes.io/part-of: mcp-server-dotnet
+subjects:
+- kind: ServiceAccount
+  name: github-runner
+  namespace: github-runners
+roleRef:
+  kind: Role
+  name: github-runner
+  apiGroup: rbac.authorization.k8s.io

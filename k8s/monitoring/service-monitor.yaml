@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: github-runner-metrics
+  namespace: github-runners
+  labels:
+    app.kubernetes.io/name: github-runner-metrics
+    app.kubernetes.io/part-of: mcp-server-dotnet
+spec:
+  ports:
+  - name: http-metrics
+    port: 8080
+    protocol: TCP
+    targetPort: http-metrics
+  selector:
+    app.kubernetes.io/name: mcp-server-dotnet-runners
+  type: ClusterIP
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: github-runner-metrics
+  namespace: github-runners
+  labels:
+    app.kubernetes.io/name: github-runner-metrics
+    app.kubernetes.io/part-of: mcp-server-dotnet
+    release: prometheus  # Adjust based on your Prometheus operator setup
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: github-runner-metrics
+  endpoints:
+  - port: http-metrics
+    interval: 30s
+    path: /metrics
+    scheme: http
+  namespaceSelector:
+    matchNames:
+    - github-runners

@@ -1,0 +1,50 @@
+# Production environment patches for GitHub Actions runners
+apiVersion: actions.summerwind.dev/v1alpha1
+kind: RunnerDeployment
+metadata:
+  name: mcp-server-dotnet-runners
+  namespace: github-runners
+spec:
+  # More replicas for production
+  replicas: 3
+  
+  template:
+    spec:
+      # Production-specific labels
+      labels:
+        - self-hosted
+        - kubernetes
+        - mcp-server-dotnet
+        - production
+        - linux
+        - x64
+      
+      # Enhanced resources for production
+      resources:
+        requests:
+          cpu: 200m
+          memory: 256Mi
+        limits:
+          cpu: "4"
+          memory: 8Gi
+      
+      # Production-specific environment variables
+      env:
+      - name: RUNNER_LABELS
+        value: "self-hosted,kubernetes,mcp-server-dotnet,production"
+      - name: ENVIRONMENT
+        value: "production"
+      - name: LOG_LEVEL
+        value: "info"
+      
+      # Node selector for production nodes
+      nodeSelector:
+        kubernetes.io/arch: amd64
+        node-type: github-runners
+      
+      # Tolerations for dedicated nodes
+      tolerations:
+      - key: "github-runners"
+        operator: "Equal"
+        value: "true"
+        effect: "NoSchedule"

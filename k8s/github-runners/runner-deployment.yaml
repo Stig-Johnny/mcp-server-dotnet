@@ -1,0 +1,99 @@
+apiVersion: actions.summerwind.dev/v1alpha1
+kind: RunnerDeployment
+metadata:
+  name: mcp-server-dotnet-runners
+  namespace: github-runners
+  labels:
+    app.kubernetes.io/name: mcp-server-dotnet-runners
+    app.kubernetes.io/part-of: mcp-server-dotnet
+spec:
+  # Number of runner replicas
+  replicas: 2
+  
+  template:
+    spec:
+      # Repository to connect to
+      repository: Stig-Johnny/mcp-server-dotnet
+      
+      # Runner labels for workflow targeting
+      labels:
+        - self-hosted
+        - kubernetes
+        - mcp-server-dotnet
+        - linux
+        - x64
+      
+      # Runner group
+      group: mcp-server-runners
+      
+      # Use ephemeral runners for security
+      ephemeral: true
+      
+      # Docker support
+      dockerEnabled: true
+      dockerdWithinRunnerContainer: true
+      
+      # Resource configuration
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: "2"
+          memory: 4Gi
+      
+      # Node selector for specific nodes if needed
+      # nodeSelector:
+      #   kubernetes.io/arch: amd64
+      #   node-type: github-runners
+      
+      # Tolerations for dedicated nodes
+      # tolerations:
+      # - key: "github-runners"
+      #   operator: "Equal"
+      #   value: "true"
+      #   effect: "NoSchedule"
+      
+      # Security context
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        fsGroup: 1000
+      
+      # Environment variables from ConfigMap
+      env:
+      - name: RUNNER_LABELS
+        valueFrom:
+          configMapKeyRef:
+            name: github-runner-config
+            key: RUNNER_LABELS
+      - name: RUNNER_GROUP
+        valueFrom:
+          configMapKeyRef:
+            name: github-runner-config
+            key: RUNNER_GROUP
+      - name: LOG_LEVEL
+        valueFrom:
+          configMapKeyRef:
+            name: github-runner-config
+            key: LOG_LEVEL
+      
+      # Volume mounts for Docker socket and tmp
+      volumeMounts:
+      - name: tmp
+        mountPath: /tmp
+      - name: var-run
+        mountPath: /var/run
+      
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: var-run
+        emptyDir: {}
+      
+      # Image pull policy
+      imagePullPolicy: Always
+      
+      # Service account
+      serviceAccountName: github-runner

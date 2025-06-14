@@ -1,0 +1,178 @@
+# GitHub Actions Runners Helm Values
+# Configuration values for the GitHub Actions self-hosted runners
+
+# Global configuration
+global:
+  # Repository configuration
+  repository: "Stig-Johnny/mcp-server-dotnet"
+  
+  # GitHub token secret name
+  tokenSecret: "github-actions-secret"
+  
+  # Runner image configuration
+  image:
+    repository: "summerwind/actions-runner"
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+# Runner deployment configuration
+runners:
+  # Number of runner replicas
+  replicas: 2
+  
+  # Runner labels for targeting in workflows
+  labels:
+    - self-hosted
+    - kubernetes
+    - mcp-server-dotnet
+    - linux
+    - x64
+  
+  # Runner group
+  group: "mcp-server-runners"
+  
+  # Use ephemeral runners (recommended for security)
+  ephemeral: true
+  
+  # Docker configuration
+  docker:
+    enabled: true
+    inContainer: true
+  
+  # Resource configuration
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: "2"
+      memory: 4Gi
+  
+  # Node selection
+  nodeSelector: {}
+    # kubernetes.io/arch: amd64
+    # node-type: github-runners
+  
+  # Tolerations for dedicated nodes
+  tolerations: []
+    # - key: "github-runners"
+    #   operator: "Equal"
+    #   value: "true"
+    #   effect: "NoSchedule"
+  
+  # Security context
+  securityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
+    runAsNonRoot: true
+    fsGroup: 1000
+  
+  # Environment variables
+  env: {}
+    # CUSTOM_VAR: "value"
+  
+  # Volume mounts
+  volumeMounts: []
+  
+  # Volumes
+  volumes: []
+
+# ServiceAccount configuration
+serviceAccount:
+  # Create service account
+  create: true
+  
+  # Name of the service account
+  name: "github-runner"
+  
+  # Annotations for the service account
+  annotations: {}
+
+# RBAC configuration
+rbac:
+  # Create RBAC resources
+  create: true
+  
+  # Additional rules
+  rules: []
+
+# Monitoring configuration
+monitoring:
+  # Enable monitoring
+  enabled: true
+  
+  # Service configuration
+  service:
+    port: 8080
+    name: http-metrics
+  
+  # ServiceMonitor configuration
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    path: /metrics
+    
+    # Labels for Prometheus operator
+    labels:
+      release: prometheus
+  
+  # Grafana dashboard
+  grafanaDashboard:
+    enabled: true
+    
+    # Dashboard configuration
+    configMap:
+      name: github-runners-grafana-dashboard
+      label: grafana_dashboard
+
+# Network policies
+networkPolicy:
+  enabled: false
+  
+  # Ingress rules
+  ingress: []
+  
+  # Egress rules  
+  egress: []
+
+# Pod disruption budget
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
+# Horizontal pod autoscaler
+hpa:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+# Additional labels and annotations
+labels: {}
+annotations: {}
+
+# Configuration for specific workflow types
+workflowConfigs:
+  # Docker builds configuration
+  dockerBuilds:
+    enabled: true
+    # Additional resources for Docker builds
+    resources:
+      limits:
+        cpu: "4"
+        memory: 8Gi
+  
+  # Performance testing configuration
+  performanceTesting:
+    enabled: true
+    # Dedicated node selection for performance tests
+    nodeSelector:
+      workload-type: performance-testing
+  
+  # Integration testing configuration
+  integrationTesting:
+    enabled: true
+    # Additional environment variables
+    env:
+      TEST_ENVIRONMENT: "kubernetes"

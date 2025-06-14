@@ -1,0 +1,135 @@
+name: Build and Test on Self-Hosted Runners
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  # Job that runs on self-hosted runners for resource-intensive tasks
+  build-and-test-self-hosted:
+    runs-on: [self-hosted, kubernetes, mcp-server-dotnet]
+    
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: src/Presentation/McpServer.Bff/frontend/package-lock.json
+    
+    - name: Restore .NET packages
+      run: dotnet restore --verbosity normal
+    
+    - name: Install npm packages
+      run: |
+        cd src/Presentation/McpServer.Bff/frontend
+        npm ci --production=false
+    
+    - name: Build React frontend
+      run: |
+        cd src/Presentation/McpServer.Bff/frontend
+        npm run build
+    
+    - name: Build .NET applications
+      run: dotnet build --no-restore --configuration Release
+    
+    - name: Run unit tests
+      run: dotnet test --no-build --configuration Release --verbosity normal --collect:"XPlat Code Coverage" --results-directory ./coverage
+    
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+      with:
+        directory: ./coverage
+        fail_ci_if_error: false
+    
+    # Performance testing that benefits from dedicated resources
+    - name: Run performance tests
+      run: |
+        echo "Running performance tests on self-hosted runners..."
+        # Add your performance test commands here
+        # Example: dotnet run --project tests/McpServer.PerformanceTests
+    
+    # Docker builds with enhanced caching on self-hosted runners
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Log in to Container Registry
+      if: github.event_name != 'pull_request'
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Create publish directories
+      run: mkdir -p publish/api publish/bff
+    
+    - name: Publish applications
+      run: |
+        dotnet publish src/Presentation/McpServer.Api/McpServer.Api.csproj -c Release -o ./publish/api --self-contained false
+        dotnet publish src/Presentation/McpServer.Bff/McpServer.Bff.csproj -c Release -o ./publish/bff --self-contained false
+    
+    - name: Extract metadata for Gateway
+      id: meta-gateway
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ github.repository }}/mcp-gateway
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+        flavor: |
+          latest=auto
+        labels: |
+          org.opencontainers.image.title=MCP Gateway
+          org.opencontainers.image.description=MCP Server .NET Gateway
+          org.opencontainers.image.vendor=Stig-Johnny
+          runner.type=self-hosted
+    
+    - name: Build and push Gateway Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile.gateway
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: ${{ steps.meta-gateway.outputs.tags }}
+        labels: ${{ steps.meta-gateway.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        platforms: linux/amd64
+        # Enhanced caching and build options for self-hosted runners
+        build-args: |
+          BUILDKIT_INLINE_CACHE=1
+    
+    # Integration tests that require more resources
+    - name: Run integration tests
+      run: |
+        echo "Running integration tests on self-hosted runners..."
+        # Add your integration test commands here
+        # These tests can use more resources and run longer
+    
+    - name: Cleanup
+      if: always()
+      run: |
+        # Clean up any artifacts or temporary files
+        docker system prune -f --volumes || true
+        rm -rf publish/ || true

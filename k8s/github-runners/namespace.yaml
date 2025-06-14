@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: github-runners
+  labels:
+    name: github-runners
+    app.kubernetes.io/name: github-runners
+    app.kubernetes.io/part-of: mcp-server-dotnet
+    app.kubernetes.io/managed-by: argocd

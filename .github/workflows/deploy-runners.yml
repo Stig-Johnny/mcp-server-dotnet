@@ -1,0 +1,234 @@
+name: Deploy GitHub Actions Runners
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'k8s/github-runners/**'
+      - 'k8s/monitoring/**'
+      - 'argocd/runners-application*.yaml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'k8s/github-runners/**'
+      - 'k8s/monitoring/**'
+      - 'argocd/runners-application*.yaml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment for deployment'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - prod
+          - both
+
+env:
+  KUBECTL_VERSION: v1.28.0
+
+jobs:
+  validate:
+    name: Validate Runner Configuration
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Setup kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: ${{ env.KUBECTL_VERSION }}
+    
+    - name: Validate Kubernetes manifests
+      run: |
+        # Validate all YAML files
+        find k8s/github-runners -name "*.yaml" -exec kubectl --dry-run=client apply -f {} \;
+        find k8s/monitoring -name "*.yaml" -exec kubectl --dry-run=client apply -f {} \;
+        find argocd -name "runners-application*.yaml" -exec kubectl --dry-run=client apply -f {} \;
+    
+    - name: Validate Kustomization
+      run: |
+        cd k8s/github-runners
+        kubectl kustomize . > /tmp/kustomized.yaml
+        kubectl --dry-run=client apply -f /tmp/kustomized.yaml
+    
+    - name: Check for secrets configuration
+      run: |
+        echo "🔍 Checking secret references..."
+        if grep -r "github-actions-secret" k8s/github-runners/; then
+          echo "✅ Secret references found"
+        else
+          echo "❌ No secret references found"
+          exit 1
+        fi
+    
+    - name: Validate ArgoCD Applications
+      run: |
+        echo "🔍 Validating ArgoCD applications..."
+        for app in argocd/runners-application*.yaml; do
+          echo "Validating $app"
+          kubectl --dry-run=client apply -f "$app"
+        done
+
+  deploy-dev:
+    name: Deploy to Development
+    runs-on: ubuntu-latest
+    needs: validate
+    if: |
+      (github.ref == 'refs/heads/develop' && github.event_name == 'push') ||
+      (github.event.inputs.environment == 'dev') ||
+      (github.event.inputs.environment == 'both')
+    environment: development
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Setup kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: ${{ env.KUBECTL_VERSION }}
+    
+    # In a real environment, you would configure kubectl to connect to your cluster
+    - name: Configure kubectl (placeholder)
+      run: |
+        echo "🔧 In a real environment, configure kubectl here:"
+        echo "kubectl config set-cluster ..."
+        echo "kubectl config set-credentials ..."
+        echo "kubectl config set-context ..."
+    
+    - name: Deploy Development Runners
+      run: |
+        echo "🚀 Deploying GitHub Actions runners to development environment..."
+        echo "This would execute:"
+        echo "kubectl apply -f argocd/runners-application-dev.yaml"
+        echo ""
+        echo "📋 Development Configuration:"
+        echo "- Namespace: github-runners-dev"
+        echo "- Replicas: 1"
+        echo "- Resources: Reduced for development"
+        echo "- Source branch: develop"
+    
+    - name: Verify Development Deployment
+      run: |
+        echo "✅ Verifying development deployment..."
+        echo "This would check:"
+        echo "- ArgoCD application sync status"
+        echo "- Runner pod readiness"
+        echo "- GitHub runner registration"
+        echo ""
+        echo "Commands that would be executed:"
+        echo "kubectl wait --for=condition=Synced app/github-runners-dev -n argocd --timeout=300s"
+        echo "kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=mcp-server-dotnet-runners -n github-runners-dev --timeout=300s"
+
+  deploy-prod:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [validate, deploy-dev]
+    if: |
+      always() && 
+      (needs.validate.result == 'success') &&
+      (
+        (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
+        (github.event.inputs.environment == 'prod') ||
+        (github.event.inputs.environment == 'both')
+      )
+    environment: production
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+    
+    - name: Setup kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: ${{ env.KUBECTL_VERSION }}
+    
+    # In a real environment, you would configure kubectl to connect to your cluster
+    - name: Configure kubectl (placeholder)
+      run: |
+        echo "🔧 In a real environment, configure kubectl here:"
+        echo "kubectl config set-cluster ..."
+        echo "kubectl config set-credentials ..."
+        echo "kubectl config set-context ..."
+    
+    - name: Deploy Production Runners
+      run: |
+        echo "🚀 Deploying GitHub Actions runners to production environment..."
+        echo "This would execute:"
+        echo "kubectl apply -f argocd/runners-application-prod.yaml"
+        echo ""
+        echo "📋 Production Configuration:"
+        echo "- Namespace: github-runners"
+        echo "- Replicas: 3"
+        echo "- Resources: Enhanced for production workloads"
+        echo "- Source branch: main"
+        echo "- Node selector: github-runners nodes"
+    
+    - name: Verify Production Deployment
+      run: |
+        echo "✅ Verifying production deployment..."
+        echo "This would check:"
+        echo "- ArgoCD application sync status"
+        echo "- Runner pod readiness"
+        echo "- GitHub runner registration"
+        echo "- Monitoring setup"
+        echo ""
+        echo "Commands that would be executed:"
+        echo "kubectl wait --for=condition=Synced app/github-runners-prod -n argocd --timeout=300s"
+        echo "kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=mcp-server-dotnet-runners -n github-runners --timeout=300s"
+        echo "kubectl get servicemonitor github-runner-metrics -n github-runners"
+
+  test-runners:
+    name: Test Runner Connectivity
+    runs-on: ubuntu-latest
+    needs: [deploy-dev, deploy-prod]
+    if: always() && (needs.deploy-dev.result == 'success' || needs.deploy-prod.result == 'success')
+    
+    steps:
+    - name: Test Runner Registration
+      run: |
+        echo "🧪 Testing runner connectivity..."
+        echo "This would verify:"
+        echo "- Runners appear in GitHub repository settings"
+        echo "- Runners can accept workflow jobs"
+        echo "- Monitoring metrics are available"
+        echo ""
+        echo "Manual verification steps:"
+        echo "1. Go to https://github.com/Stig-Johnny/mcp-server-dotnet/settings/actions/runners"
+        echo "2. Check for 'mcp-server-dotnet' labeled runners"
+        echo "3. Verify runner status is 'Idle' or 'Active'"
+        echo "4. Check Grafana dashboard for runner metrics"
+
+  notify:
+    name: Deployment Notification
+    runs-on: ubuntu-latest
+    needs: [validate, deploy-dev, deploy-prod, test-runners]
+    if: always()
+    
+    steps:
+    - name: Deployment Summary
+      run: |
+        echo "=== GitHub Actions Runners Deployment Summary ==="
+        echo "Validation: ${{ needs.validate.result || 'skipped' }}"
+        echo "Development: ${{ needs.deploy-dev.result || 'skipped' }}"
+        echo "Production: ${{ needs.deploy-prod.result || 'skipped' }}"
+        echo "Testing: ${{ needs.test-runners.result || 'skipped' }}"
+        echo "Branch/Ref: ${{ github.ref }}"
+        echo "Commit SHA: ${{ github.sha }}"
+        echo "================================================="
+        
+        if [[ "${{ needs.validate.result }}" == "success" ]]; then
+          echo "✅ Configuration validation passed"
+        else
+          echo "❌ Configuration validation failed"
+        fi
+        
+        if [[ "${{ needs.deploy-dev.result }}" == "success" || "${{ needs.deploy-prod.result }}" == "success" ]]; then
+          echo "✅ At least one environment deployed successfully"
+        else
+          echo "⚠️  No environments were deployed"
+        fi
