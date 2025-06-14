@@ -1,0 +1,17 @@
+apiVersion: v2
+name: mcp-server-dotnet
+description: A Helm chart for MCP Server .NET Aspire application
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - mcp
+  - dotnet
+  - aspire
+  - api
+home: https://github.com/Stig-Johnny/mcp-server-dotnet
+sources:
+  - https://github.com/Stig-Johnny/mcp-server-dotnet
+maintainers:
+  - name: Stig-Johnny
+    url: https://github.com/Stig-Johnny

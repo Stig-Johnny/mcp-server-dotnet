@@ -1,5 +1,8 @@
 var builder = WebApplication.CreateBuilder(args);
 
+// Add health checks
+builder.Services.AddHealthChecks();
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -28,6 +31,10 @@ app.UseHttpsRedirection();
 // Serve static files from the React build output
 app.UseStaticFiles();
 app.UseDefaultFiles();
+
+// Map health check endpoints
+app.MapHealthChecks("/health");
+app.MapHealthChecks("/health/ready");
 
 // Assets endpoint - mocked for now
 app.MapGet("/api/assets", () =>

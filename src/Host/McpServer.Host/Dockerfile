@@ -1,9 +1,9 @@
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
 WORKDIR /app
 EXPOSE 80
-EXPOSE 443
+EXPOSE 8080
 
 # Copy the pre-built application
-COPY ["publish/api", "./"]
+COPY ["publish/host", "./"]
 
-ENTRYPOINT ["dotnet", "McpServer.Api.dll"]
+ENTRYPOINT ["dotnet", "McpServer.Host.dll"]

@@ -1,0 +1,137 @@
+name: Build and Push Docker Images
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    # Setup .NET SDK
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+
+    # Setup Node.js
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: src/Presentation/McpServer.Bff/frontend/package-lock.json
+
+    # Restore .NET packages
+    - name: Restore .NET packages
+      run: dotnet restore --verbosity normal
+
+    # Install npm packages
+    - name: Install npm packages
+      run: |
+        cd src/Presentation/McpServer.Bff/frontend
+        npm ci --production=false
+
+    # Build React frontend
+    - name: Build React frontend
+      run: |
+        cd src/Presentation/McpServer.Bff/frontend
+        npm run build
+
+    # Create publish directories
+    - name: Create publish directories
+      run: mkdir -p publish/api publish/bff
+
+    # Build and publish .NET applications
+    - name: Publish API
+      run: dotnet publish src/Presentation/McpServer.Api/McpServer.Api.csproj -c Release -o ./publish/api --self-contained false
+
+    - name: Publish BFF
+      run: dotnet publish src/Presentation/McpServer.Bff/McpServer.Bff.csproj -c Release -o ./publish/bff --self-contained false
+
+    # Setup Docker Buildx
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    # Login to container registry
+    - name: Log in to Container Registry
+      if: github.event_name != 'pull_request'
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    # Extract metadata for API
+    - name: Extract metadata for API
+      id: meta-api
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ github.repository }}/mcp-server-api
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=sha
+        flavor: |
+          latest=auto
+
+    # Extract metadata for BFF
+    - name: Extract metadata for BFF
+      id: meta-bff
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ github.repository }}/mcp-server-bff
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=sha
+        flavor: |
+          latest=auto
+
+    # Build and push API Docker image
+    - name: Build and push API Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./src/Presentation/McpServer.Api/Dockerfile
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: ${{ steps.meta-api.outputs.tags }}
+        labels: ${{ steps.meta-api.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        platforms: linux/amd64
+
+    # Build and push BFF Docker image
+    - name: Build and push BFF Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./src/Presentation/McpServer.Bff/Dockerfile
+        push: ${{ github.event_name != 'pull_request' }}
+        tags: ${{ steps.meta-bff.outputs.tags }}
+        labels: ${{ steps.meta-bff.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        platforms: linux/amd64

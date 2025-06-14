@@ -1,0 +1,52 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: mcp-server
+  namespace: argocd
+spec:
+  description: MCP Server .NET Project
+  sourceRepos:
+  - 'https://github.com/Stig-Johnny/mcp-server-dotnet.git'
+  destinations:
+  - namespace: mcp-server
+    server: https://kubernetes.default.svc
+  - namespace: mcp-server-dev
+    server: https://kubernetes.default.svc
+  - namespace: mcp-server-staging
+    server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+  - group: ''
+    kind: Namespace
+  - group: rbac.authorization.k8s.io
+    kind: ClusterRole
+  - group: rbac.authorization.k8s.io
+    kind: ClusterRoleBinding
+  namespaceResourceWhitelist:
+  - group: ''
+    kind: ConfigMap
+  - group: ''
+    kind: Secret
+  - group: ''
+    kind: Service
+  - group: ''
+    kind: ServiceAccount
+  - group: apps
+    kind: Deployment
+  - group: apps
+    kind: ReplicaSet
+  - group: networking.k8s.io
+    kind: Ingress
+  - group: networking.k8s.io
+    kind: NetworkPolicy
+  - group: policy
+    kind: PodDisruptionBudget
+  - group: autoscaling
+    kind: HorizontalPodAutoscaler
+  roles:
+  - name: admin
+    description: Admin access to mcp-server project
+    policies:
+    - p, proj:mcp-server:admin, applications, *, mcp-server/*, allow
+    - p, proj:mcp-server:admin, repositories, *, *, allow
+    groups:
+    - argocd-admins

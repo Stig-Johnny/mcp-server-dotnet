@@ -25,11 +25,14 @@ This solution follows Clean Architecture principles with clear separation of con
 - **Docker Support**: Container-ready with optimized Dockerfile
 - **Swagger/OpenAPI**: API documentation and testing interface
 
-## Prerequisites
+## Quick Start
+
+### Prerequisites
 
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
 - [Docker](https://www.docker.com/get-started) (optional, for containerization)
 - [Visual Studio 2022](https://visualstudio.microsoft.com/) or [JetBrains Rider](https://www.jetbrains.com/rider/) (recommended)
+- [Kubernetes cluster with ArgoCD](docs/kubernetes-deployment.md) (optional, for production deployment)
 
 ## Getting Started
 
@@ -52,21 +55,40 @@ dotnet restore
 dotnet build
 ```
 
-### 4. Run the API
+### 4. Run the Application
 
+#### Option A: Run with Aspire Host (Recommended for Development)
 ```bash
-# Run the API directly
-dotnet run --project src/Presentation/McpServer.Api
-
-# Or run with Aspire Host (recommended)
 dotnet run --project src/Host/McpServer.Host
 ```
 
-### 5. Access the API
+#### Option B: Run Individual Services
+```bash
+# Run the API
+dotnet run --project src/Presentation/McpServer.Api
+
+# Run the BFF (in another terminal)
+dotnet run --project src/Presentation/McpServer.Bff
+```
+
+#### Option C: Deploy to Kubernetes (Production)
+```bash
+# Quick deployment with ArgoCD
+kubectl apply -f argocd/application.yaml
+
+# Or manual deployment with Helm
+helm install mcp-server ./helm/mcp-server-dotnet \
+  --namespace mcp-server \
+  --create-namespace
+```
+
+### 5. Access the Application
 
 - **API Base URL**: `https://localhost:7001` or `http://localhost:5001`
+- **BFF Base URL**: `https://localhost:7245` or `http://localhost:5245`
 - **Swagger UI**: `https://localhost:7001/swagger`
 - **Health Check**: `https://localhost:7001/health`
+- **Aspire Dashboard**: `https://localhost:15888` (when running with Aspire Host)
 
 ## API Endpoints
 
@@ -187,7 +209,36 @@ dotnet run --project src/Host/McpServer.Host
 
 ### Production
 
+#### Kubernetes with ArgoCD (Recommended)
+
+Deploy to Kubernetes using ArgoCD and Helm:
+
+```bash
+# Apply ArgoCD application
+kubectl apply -f argocd/application.yaml
+
+# Or deploy manually with Helm
+helm install mcp-server ./helm/mcp-server-dotnet \
+  --namespace mcp-server \
+  --create-namespace \
+  --set global.tag=main
+```
+
+For detailed Kubernetes deployment instructions, see [Kubernetes Deployment Guide](docs/kubernetes-deployment.md).
+
+#### Docker Container
+
 Deploy as a Docker container or directly to Azure App Service, AWS, or any .NET-compatible hosting platform.
+
+```bash
+# Build and run API
+docker build -f src/Presentation/McpServer.Api/Dockerfile -t mcp-server-api .
+docker run -p 8080:80 mcp-server-api
+
+# Build and run BFF
+docker build -f src/Presentation/McpServer.Bff/Dockerfile -t mcp-server-bff .
+docker run -p 8081:80 mcp-server-bff
+```
 
 ## Contributing
 
