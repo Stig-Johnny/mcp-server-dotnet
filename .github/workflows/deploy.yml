@@ -25,7 +25,7 @@ env:
 jobs:
   # Deploy to Development Environment
   deploy-dev:
-    runs-on: ubuntu-latest
+    runs-on: mcp-server-dotnet
     if: github.ref == 'refs/heads/develop' || github.event.inputs.environment == 'dev' || github.event.inputs.environment == 'both'
     environment: development
     outputs:
@@ -67,7 +67,7 @@ jobs:
 
   # Deploy to Production Environment (only after successful dev deployment)
   deploy-prod:
-    runs-on: ubuntu-latest
+    runs-on: mcp-server-dotnet
     needs: [deploy-dev]
     if: |
       always() && (
@@ -133,7 +133,7 @@ jobs:
 
   # Notification job (runs after both deployments)
   notify:
-    runs-on: ubuntu-latest
+    runs-on: mcp-server-dotnet
     needs: [deploy-dev, deploy-prod]
     if: always()
     

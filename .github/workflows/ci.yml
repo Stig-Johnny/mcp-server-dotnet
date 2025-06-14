@@ -8,7 +8,7 @@ on:
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
+    runs-on: mcp-server-dotnet
     
     steps:
     - uses: actions/checkout@v4
