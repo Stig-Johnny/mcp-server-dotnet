@@ -13,8 +13,6 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME_API: ${{ github.repository }}/mcp-server-api
-  IMAGE_NAME_BFF: ${{ github.repository }}/mcp-server-bff
 
 jobs:
   build-and-push:
@@ -22,6 +20,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      id-token: write
 
     steps:
     - name: Checkout repository
@@ -81,6 +80,7 @@ jobs:
           network=host
 
     - name: Log in to Container Registry
+      if: github.event_name != 'pull_request'
       uses: docker/login-action@v3
       with:
         registry: ${{ env.REGISTRY }}
@@ -91,32 +91,36 @@ jobs:
       id: meta-api
       uses: docker/metadata-action@v5
       with:
-        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_API }}
+        images: ${{ env.REGISTRY }}/${{ github.repository }}/mcp-server-api
         tags: |
           type=ref,event=branch
           type=ref,event=pr
           type=semver,pattern={{version}}
           type=semver,pattern={{major}}.{{minor}}
           type=sha,prefix={{branch}}-
+        flavor: |
+          latest=auto
 
     - name: Extract metadata for BFF
       id: meta-bff
       uses: docker/metadata-action@v5
       with:
-        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_BFF }}
+        images: ${{ env.REGISTRY }}/${{ github.repository }}/mcp-server-bff
         tags: |
           type=ref,event=branch
           type=ref,event=pr
           type=semver,pattern={{version}}
           type=semver,pattern={{major}}.{{minor}}
           type=sha,prefix={{branch}}-
+        flavor: |
+          latest=auto
 
     - name: Build and push API Docker image
       uses: docker/build-push-action@v5
       with:
         context: .
         file: ./src/Presentation/McpServer.Api/Dockerfile
-        push: true
+        push: ${{ github.event_name != 'pull_request' }}
         tags: ${{ steps.meta-api.outputs.tags }}
         labels: ${{ steps.meta-api.outputs.labels }}
         cache-from: type=gha
@@ -130,7 +134,7 @@ jobs:
       with:
         context: .
         file: ./src/Presentation/McpServer.Bff/Dockerfile
-        push: true
+        push: ${{ github.event_name != 'pull_request' }}
         tags: ${{ steps.meta-bff.outputs.tags }}
         labels: ${{ steps.meta-bff.outputs.labels }}
         cache-from: type=gha
