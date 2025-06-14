@@ -186,8 +186,9 @@ host:
       memory: 128Mi
 
 # Ingress Configuration
+# Note: Ingress with custom domains is disabled as it will be handled by external software
 ingress:
-  enabled: true
+  enabled: false
   className: "nginx"
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /
@@ -195,38 +196,8 @@ ingress:
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
     nginx.ingress.kubernetes.io/rate-limit: "100"
     nginx.ingress.kubernetes.io/rate-limit-window: "1m"
-  hosts:
-    - host: mcp-gateway.local
-      paths:
-        # MCP Protocol endpoints - route to dedicated gateway
-        - path: /api/mcp
-          pathType: Prefix
-          backend:
-            service: gateway
-        # Health checks for gateway
-        - path: /health
-          pathType: Prefix
-          backend:
-            service: gateway
-        # Swagger/API documentation
-        - path: /swagger
-          pathType: Prefix
-          backend:
-            service: gateway
-        # Legacy API routes - route to API service
-        - path: /api
-          pathType: Prefix
-          backend:
-            service: api
-        # Frontend - route to BFF service
-        - path: /
-          pathType: Prefix
-          backend:
-            service: bff
-  tls:
-    - secretName: mcp-gateway-tls
-      hosts:
-        - mcp-gateway.local
+  hosts: []
+  tls: []
 
 # Service Account
 serviceAccount:
