@@ -32,7 +32,28 @@ The MCP Gateway is a production-optimized container that provides:
 
 ## Quick Start
 
-### 1. Deploy MCP Gateway with ArgoCD (Recommended)
+### Interactive Setup (Easiest)
+
+For the fastest and most automated deployment experience, use the interactive setup script:
+
+```bash
+# Run interactive setup with all features
+./scripts/deploy-interactive.sh
+
+# View available options
+./scripts/deploy-interactive.sh --help
+```
+
+The interactive setup will guide you through:
+- ✅ Container registry access setup (for private images)
+- ✅ Git write-back configuration for automatic updates
+- ✅ **Cloudflare tunnel setup for stigjohnny.no domain**
+- ✅ ArgoCD application deployment
+- ✅ Monitoring and status verification
+
+> 🌐 **Cloudflare Integration**: The interactive setup now includes automated Cloudflare tunnel configuration for secure external access via stigjohnny.no without exposing your cluster directly.
+
+### 1. Deploy MCP Gateway with ArgoCD (Advanced)
 
 > 📖 **Comprehensive ArgoCD Guide**: For detailed ArgoCD deployment automation, including application manifest creation, sync policies configuration, and status verification, see the [**ArgoCD Deployment Guide**](argocd-deployment.md).
 

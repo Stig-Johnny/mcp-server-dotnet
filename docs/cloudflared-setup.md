@@ -2,6 +2,37 @@
 
 This document provides step-by-step instructions for setting up Cloudflare Tunnels with the MCP Server .NET deployment for the stigjohnny.no domain.
 
+## Setup Options
+
+You can set up Cloudflare tunnels in two ways:
+
+1. **Interactive Setup (Recommended)**: Use the interactive deployment script which automates the entire process
+2. **Manual Setup**: Follow the step-by-step instructions below for manual configuration
+
+### Option 1: Interactive Setup
+
+The interactive deployment script now includes automated Cloudflare tunnel setup:
+
+```bash
+# Run the interactive setup script
+./scripts/deploy-interactive.sh
+
+# Or skip other setup steps and only configure tunnels
+./scripts/deploy-interactive.sh --skip-registry --skip-git
+```
+
+The interactive setup will:
+- ✅ Check if `cloudflared` CLI is installed and you're authenticated
+- ✅ Create tunnels for all environments (prod, staging, dev)
+- ✅ Configure DNS records automatically
+- ✅ Create Kubernetes secrets with tunnel credentials
+- ✅ Update Helm values files with actual tunnel IDs
+- ✅ Enable cloudflared in the deployment configuration
+
+### Option 2: Manual Setup
+
+If you prefer manual setup or need to troubleshoot, follow the instructions below.
+
 ## Prerequisites
 
 - Cloudflare account with stigjohnny.no domain configured
