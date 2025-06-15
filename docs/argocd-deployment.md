@@ -5,6 +5,8 @@ This comprehensive guide provides detailed steps for automating the deployment o
 ## Table of Contents
 
 1. [Simplified Workflow for Public Repositories](#simplified-workflow-for-public-repositories)
+   - [Interactive Deployment Script (Recommended)](#interactive-deployment-script-recommended)
+   - [Manual Quick Start (3 Steps)](#manual-quick-start-3-steps)
 2. [Prerequisites](#prerequisites)
 3. [ArgoCD Application Architecture](#argocd-application-architecture)
 4. [Creating Application Manifests](#creating-application-manifests)
@@ -19,7 +21,38 @@ This comprehensive guide provides detailed steps for automating the deployment o
 
 For users who prefer a streamlined approach without additional tools like the ArgoCD CLI, this section provides a simplified workflow that works with public GitHub repositories.
 
-### Quick Start (3 Steps)
+### Interactive Deployment Script (Recommended)
+
+The easiest way to deploy is using our interactive script that handles secrets, credentials, and deployment automatically:
+
+```bash
+# Run the interactive deployment script
+./scripts/deploy-interactive.sh
+```
+
+The script will guide you through:
+- ✅ Prerequisites checking (kubectl, ArgoCD)
+- ✅ Container registry setup (optional for private images)
+- ✅ Git write-back credentials (optional for auto-updates)
+- ✅ Application deployment with app-of-apps pattern
+- ✅ Deployment status monitoring
+
+**Script Options:**
+```bash
+# Skip container registry setup (for public images)
+./scripts/deploy-interactive.sh --skip-registry
+
+# Skip Git write-back setup (no auto-updates)
+./scripts/deploy-interactive.sh --skip-git
+
+# Deploy applications only (skip secrets setup)
+./scripts/deploy-interactive.sh --apps-only
+
+# Show current deployment status
+./scripts/deploy-interactive.sh --status
+```
+
+### Manual Quick Start (3 Steps)
 
 #### Step 1: Clone or Pull the Repository
 
@@ -78,6 +111,19 @@ If this command succeeds without authentication, the images are public and no pu
 
 ### Complete Simplified Workflow
 
+**Option 1: Interactive Script (Recommended)**
+```bash
+# Clone the repository
+git clone https://github.com/Stig-Johnny/mcp-server-dotnet.git
+cd mcp-server-dotnet
+
+# Run the interactive deployment script
+./scripts/deploy-interactive.sh
+
+# The script handles everything: secrets, deployment, and monitoring
+```
+
+**Option 2: Manual Commands**
 ```bash
 # 1. Get the latest code
 git clone https://github.com/Stig-Johnny/mcp-server-dotnet.git
@@ -579,7 +625,9 @@ regexp:^(main|v.*)$
 
 ## Deployment Procedures
 
-> **Quick Start**: For a streamlined approach, see the [Simplified Workflow for Public Repositories](#simplified-workflow-for-public-repositories) section above.
+> **Quick Start**: For the simplest deployment experience, use the [Interactive Deployment Script](#interactive-deployment-script-recommended) which handles all the steps below automatically.
+
+> **Alternative**: For a streamlined approach, see the [Simplified Workflow for Public Repositories](#simplified-workflow-for-public-repositories) section above.
 
 ### 1. App-of-Apps Deployment (Recommended)
 
