@@ -32,7 +32,28 @@ The MCP Gateway is a production-optimized container that provides:
 
 ## Quick Start
 
-### 1. Deploy MCP Gateway with ArgoCD (Recommended)
+### Interactive Setup (Easiest)
+
+For the fastest and most automated deployment experience, use the interactive setup script:
+
+```bash
+# Run interactive setup with all features
+./scripts/deploy-interactive.sh
+
+# View available options
+./scripts/deploy-interactive.sh --help
+```
+
+The interactive setup will guide you through:
+- ✅ Container registry access setup (for private images)
+- ✅ Git write-back configuration for automatic updates
+- ✅ **Cloudflare tunnel setup for stigjohnny.no domain**
+- ✅ ArgoCD application deployment
+- ✅ Monitoring and status verification
+
+> 🌐 **Cloudflare Integration**: The interactive setup now includes automated Cloudflare tunnel configuration for secure external access via stigjohnny.no without exposing your cluster directly.
+
+### 1. Deploy MCP Gateway with ArgoCD (Advanced)
 
 > 📖 **Comprehensive ArgoCD Guide**: For detailed ArgoCD deployment automation, including application manifest creation, sync policies configuration, and status verification, see the [**ArgoCD Deployment Guide**](argocd-deployment.md).
 
@@ -223,6 +244,77 @@ mcp-gateway-gateway.mcp-gateway.svc.cluster.local:80
 ##### Option 2: Cloudflare Tunnels
 
 Cloudflare Tunnels provide secure access without exposing your cluster directly to the internet.
+
+##### Option 2a: GitOps Deployment (Recommended)
+
+The MCP Server includes integrated Cloudflare Tunnel support via GitOps deployment using Helm charts and ArgoCD.
+
+1. **Create Cloudflare Tunnel**:
+   ```bash
+   # Create tunnel for your domain
+   cloudflared tunnel create mcp-server-prod
+   cloudflared tunnel create mcp-server-staging
+   cloudflared tunnel create mcp-server-dev
+   
+   # Note the tunnel IDs from the output
+   ```
+
+2. **Configure DNS Records**:
+   ```bash
+   # Add CNAME records for production
+   cloudflared tunnel route dns mcp-server-prod mcp-server.stigjohnny.no
+   cloudflared tunnel route dns mcp-server-prod mcp-gateway.stigjohnny.no
+   cloudflared tunnel route dns mcp-server-prod mcp-api.stigjohnny.no
+   
+   # Add CNAME records for staging
+   cloudflared tunnel route dns mcp-server-staging mcp-staging.stigjohnny.no
+   cloudflared tunnel route dns mcp-server-staging mcp-gateway-staging.stigjohnny.no
+   cloudflared tunnel route dns mcp-server-staging mcp-api-staging.stigjohnny.no
+   
+   # Add CNAME records for development
+   cloudflared tunnel route dns mcp-server-dev mcp-dev.stigjohnny.no
+   cloudflared tunnel route dns mcp-server-dev mcp-gateway-dev.stigjohnny.no
+   cloudflared tunnel route dns mcp-server-dev mcp-api-dev.stigjohnny.no
+   ```
+
+3. **Create Kubernetes Secrets** (manual step required):
+   ```bash
+   # Production environment
+   kubectl create namespace mcp-server
+   kubectl create secret generic mcp-server-dotnet-cloudflared-creds \
+     --from-file=credentials.json=~/.cloudflared/<tunnel-id>.json \
+     --namespace=mcp-server
+   
+   # Repeat for staging and development environments as needed
+   ```
+
+4. **Update Helm Values** with actual tunnel IDs:
+   ```bash
+   # Edit values files to replace REPLACE_WITH_ACTUAL_TUNNEL_ID
+   # Production: helm/mcp-server-dotnet/values-prod.yaml
+   # Staging: helm/mcp-server-dotnet/values-staging.yaml
+   # Development: helm/mcp-server-dotnet/values-dev.yaml
+   ```
+
+5. **Deploy via ArgoCD**:
+   ```bash
+   # ArgoCD will automatically deploy cloudflared along with the applications
+   kubectl apply -f argocd/app-of-apps.yaml
+   ```
+
+The GitOps approach provides:
+- ✅ Integrated deployment with application lifecycle
+- ✅ Environment-specific tunnel configurations
+- ✅ Automatic scaling and pod disruption budgets
+- ✅ Consistent resource management
+- ✅ Configuration drift detection and remediation
+
+**Configured Domains for stigjohnny.no**:
+- **Production**: `mcp-server.stigjohnny.no`, `mcp-gateway.stigjohnny.no`, `mcp-api.stigjohnny.no`
+- **Staging**: `mcp-staging.stigjohnny.no`, `mcp-gateway-staging.stigjohnny.no`, `mcp-api-staging.stigjohnny.no`
+- **Development**: `mcp-dev.stigjohnny.no`, `mcp-gateway-dev.stigjohnny.no`, `mcp-api-dev.stigjohnny.no`
+
+##### Option 2b: Manual Deployment (Legacy)
 
 1. **Install cloudflared** in your cluster:
    ```bash

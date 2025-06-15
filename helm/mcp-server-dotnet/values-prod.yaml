@@ -41,6 +41,31 @@ bff:
     - name: ASPNETCORE_URLS
       value: "http://+:8080"
 
+# Cloudflare Tunnel Configuration for Production
+cloudflared:
+  enabled: true
+  replicaCount: 2
+  tunnel:
+    # Tunnel ID should be provided via external secret management or CI/CD
+    id: "REPLACE_WITH_ACTUAL_TUNNEL_ID"
+    name: "mcp-server-prod"
+    ingress:
+      - hostname: "mcp-server.stigjohnny.no"
+        service: "http://mcp-server-dotnet-bff.mcp-server.svc.cluster.local:80"
+      - hostname: "mcp-gateway.stigjohnny.no"
+        service: "http://mcp-server-dotnet-gateway.mcp-server.svc.cluster.local:80"
+      - hostname: "mcp-api.stigjohnny.no"
+        service: "http://mcp-server-dotnet-api.mcp-server.svc.cluster.local:80"
+      - service: "http_status:404"
+  
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
 # Note: Ingress with custom domains is disabled as it will be handled by external software
 ingress:
   enabled: false

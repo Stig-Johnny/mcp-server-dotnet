@@ -257,6 +257,55 @@ monitoring:
     interval: 30s
     path: /metrics
     
+# Cloudflare Tunnel Configuration
+cloudflared:
+  enabled: false  # Enable per environment as needed
+  replicaCount: 2
+  image:
+    repository: cloudflare/cloudflared
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  
+  # Tunnel configuration
+  tunnel:
+    # Tunnel ID will be provided via environment-specific values
+    id: ""
+    # Tunnel name for identification
+    name: "mcp-server"
+    # Ingress rules for routing
+    ingress:
+      - hostname: "mcp-server.stigjohnny.no"
+        service: "http://mcp-server-dotnet-bff.mcp-server.svc.cluster.local:80"
+      - hostname: "mcp-gateway.stigjohnny.no"
+        service: "http://mcp-server-dotnet-gateway.mcp-server.svc.cluster.local:80"
+      - hostname: "mcp-api.stigjohnny.no"
+        service: "http://mcp-server-dotnet-api.mcp-server.svc.cluster.local:80"
+      - service: "http_status:404"
+  
+  # Resource requirements
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 50m
+      memory: 64Mi
+  
+  # Security context
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+      - ALL
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    runAsUser: 65534  # nobody user
+  
+  # Pod disruption budget
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
 # ConfigMap and Secrets
 config:
   # Additional environment variables
