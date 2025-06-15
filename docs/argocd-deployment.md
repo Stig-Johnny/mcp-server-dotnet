@@ -4,15 +4,101 @@ This comprehensive guide provides detailed steps for automating the deployment o
 
 ## Table of Contents
 
-1. [Prerequisites](#prerequisites)
-2. [ArgoCD Application Architecture](#argocd-application-architecture)
-3. [Creating Application Manifests](#creating-application-manifests)
-4. [Sync Policies Configuration](#sync-policies-configuration)
-5. [ArgoCD Image Updater Integration](#argocd-image-updater-integration)
-6. [Deployment Procedures](#deployment-procedures)
-7. [Application Status Verification](#application-status-verification)
-8. [Troubleshooting](#troubleshooting)
-9. [Best Practices](#best-practices)
+1. [Simplified Workflow for Public Repositories](#simplified-workflow-for-public-repositories)
+2. [Prerequisites](#prerequisites)
+3. [ArgoCD Application Architecture](#argocd-application-architecture)
+4. [Creating Application Manifests](#creating-application-manifests)
+5. [Sync Policies Configuration](#sync-policies-configuration)
+6. [ArgoCD Image Updater Integration](#argocd-image-updater-integration)
+7. [Deployment Procedures](#deployment-procedures)
+8. [Application Status Verification](#application-status-verification)
+9. [Troubleshooting](#troubleshooting)
+10. [Best Practices](#best-practices)
+
+## Simplified Workflow for Public Repositories
+
+For users who prefer a streamlined approach without additional tools like the ArgoCD CLI, this section provides a simplified workflow that works with public GitHub repositories.
+
+### Quick Start (3 Steps)
+
+#### Step 1: Clone or Pull the Repository
+
+```bash
+# Clone the repository (first time)
+git clone https://github.com/Stig-Johnny/mcp-server-dotnet.git
+cd mcp-server-dotnet
+
+# OR pull latest changes (if already cloned)
+git pull origin main
+```
+
+#### Step 2: Apply the App-of-Apps Manifest
+
+```bash
+# Deploy all applications using the app-of-apps pattern
+kubectl apply -f argocd/app-of-apps.yaml
+
+# Verify the root application is created
+kubectl get applications -n argocd mcp-server-dotnet-apps
+```
+
+#### Step 3: Wait for Deployment
+
+```bash
+# Monitor application creation (takes 1-2 minutes)
+kubectl get applications -n argocd
+
+# Check all applications are healthy
+kubectl get applications -n argocd -o wide
+```
+
+### When GitHub Credentials Are Still Required
+
+**You can skip GitHub credentials for:**
+- ✅ Cloning public repositories (as shown above)
+- ✅ Pulling repository updates
+- ✅ ArgoCD accessing public Git repositories
+
+**You still need GitHub credentials for:**
+- ❌ Accessing private container images in GitHub Container Registry (ghcr.io)
+- ❌ Private repositories
+- ❌ ArgoCD Image Updater writing back to Git (if enabled)
+
+### Container Registry Considerations
+
+If you're using **public container images**, you can skip the pull secret creation entirely. However, if your container images are hosted in a private registry (like GitHub Container Registry), you'll need to create pull secrets as described in the [Prerequisites](#prerequisites) section.
+
+To check if container images are public, try:
+```bash
+# Test if container images are publicly accessible
+docker pull ghcr.io/stig-johnny/mcp-server-dotnet/mcp-gateway:main
+```
+
+If this command succeeds without authentication, the images are public and no pull secrets are needed.
+
+### Complete Simplified Workflow
+
+```bash
+# 1. Get the latest code
+git clone https://github.com/Stig-Johnny/mcp-server-dotnet.git
+cd mcp-server-dotnet
+
+# 2. Deploy everything with one command
+kubectl apply -f argocd/app-of-apps.yaml
+
+# 3. Verify deployment
+kubectl get applications -n argocd
+kubectl get pods -n mcp-server
+kubectl get pods -n mcp-gateway
+```
+
+This approach eliminates the need for:
+- ArgoCD CLI installation and configuration
+- GitHub credential management (for public repos)
+- Manual secret creation (if using public images)
+- Complex multi-step deployment procedures
+
+For advanced features like automated image updates or private repositories, refer to the detailed sections below.
 
 ## Prerequisites
 
@@ -39,6 +125,8 @@ kubectl get pods -n argocd -l app.kubernetes.io/name=argocd-image-updater
 ```
 
 ### Configure Container Registry Access
+
+**For Private Container Images Only** - Skip this section if using public container images or following the [simplified workflow](#simplified-workflow-for-public-repositories).
 
 Create a pull secret for GitHub Container Registry access:
 
@@ -490,6 +578,8 @@ regexp:^(main|v.*)$
 ```
 
 ## Deployment Procedures
+
+> **Quick Start**: For a streamlined approach, see the [Simplified Workflow for Public Repositories](#simplified-workflow-for-public-repositories) section above.
 
 ### 1. App-of-Apps Deployment (Recommended)
 
