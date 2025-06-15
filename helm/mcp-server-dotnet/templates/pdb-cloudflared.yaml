@@ -1,0 +1,16 @@
+{{- if and .Values.cloudflared.enabled .Values.cloudflared.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "mcp-server-dotnet.fullname" . }}-cloudflared
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mcp-server-dotnet.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cloudflared
+spec:
+  minAvailable: {{ .Values.cloudflared.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "mcp-server-dotnet.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: cloudflared
+{{- end }}

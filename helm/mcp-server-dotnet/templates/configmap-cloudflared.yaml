@@ -1,0 +1,26 @@
+{{- if .Values.cloudflared.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "mcp-server-dotnet.fullname" . }}-cloudflared-config
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mcp-server-dotnet.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cloudflared
+data:
+  config.yaml: |
+    tunnel: {{ .Values.cloudflared.tunnel.id | quote }}
+    credentials-file: /etc/cloudflared/creds/credentials.json
+    
+    metrics: 0.0.0.0:2000
+    
+    ingress:
+    {{- range .Values.cloudflared.tunnel.ingress }}
+    {{- if .hostname }}
+    - hostname: {{ .hostname | quote }}
+      service: {{ .service | quote }}
+    {{- else }}
+    - service: {{ .service | quote }}
+    {{- end }}
+    {{- end }}
+{{- end }}
