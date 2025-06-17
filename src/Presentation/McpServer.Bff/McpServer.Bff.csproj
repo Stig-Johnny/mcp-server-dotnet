@@ -12,6 +12,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\Application\McpServer.Application\McpServer.Application.csproj" />
+    <ProjectReference Include="..\..\Infrastructure\McpServer.Infrastructure\McpServer.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Exclude frontend build files from default content items -->
     <Content Remove="frontend\build\**" />
     <Content Remove="frontend\**" />

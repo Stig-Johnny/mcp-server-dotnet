@@ -82,4 +82,52 @@ public class AssetsApiTests : IClassFixture<WebApplicationFactory<Program>>
         Assert.Contains("<title>React App</title>", content);
         Assert.Contains("<div id=\"root\">", content);
     }
+
+    [Fact]
+    public async Task GetMcpTools_ShouldReturnOk()
+    {
+        // Act
+        var response = await _client.GetAsync("/api/mcp/tools");
+
+        // Assert
+        response.EnsureSuccessStatusCode();
+        Assert.Equal("application/json; charset=utf-8", 
+            response.Content.Headers.ContentType?.ToString());
+    }
+
+    [Fact]
+    public async Task GetMcpTools_ShouldReturnToolsList()
+    {
+        // Act
+        var response = await _client.GetAsync("/api/mcp/tools");
+        var tools = await response.Content.ReadFromJsonAsync<object[]>();
+
+        // Assert
+        Assert.NotNull(tools);
+        Assert.True(tools.Length > 0);
+    }
+
+    [Fact]
+    public async Task GetMcpResources_ShouldReturnOk()
+    {
+        // Act
+        var response = await _client.GetAsync("/api/mcp/resources");
+
+        // Assert
+        response.EnsureSuccessStatusCode();
+        Assert.Equal("application/json; charset=utf-8", 
+            response.Content.Headers.ContentType?.ToString());
+    }
+
+    [Fact]
+    public async Task GetMcpResources_ShouldReturnResourcesList()
+    {
+        // Act
+        var response = await _client.GetAsync("/api/mcp/resources");
+        var resources = await response.Content.ReadFromJsonAsync<object[]>();
+
+        // Assert
+        Assert.NotNull(resources);
+        Assert.True(resources.Length >= 0); // Resources can be empty
+    }
 }
