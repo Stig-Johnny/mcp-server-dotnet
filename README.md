@@ -21,6 +21,9 @@ This solution follows Clean Architecture principles with clear separation of con
 - **Domain-Driven Design**: Rich domain model with proper encapsulation
 - **MCP Protocol Support**: Model Context Protocol implementation with tools and resources
 - **ASP.NET Core Web API**: RESTful API for MCP operations
+- **React Frontend**: Modern web UI with TypeScript for interacting with MCP services
+- **Backend-for-Frontend (BFF)**: Dedicated API gateway for frontend integration
+- **API Key Authentication**: Secure access to MCP endpoints
 - **.NET Aspire**: Modern orchestration and observability
 - **Docker Support**: Container-ready with optimized Dockerfile
 - **Swagger/OpenAPI**: API documentation and testing interface
@@ -86,30 +89,44 @@ helm install mcp-server ./helm/mcp-server-dotnet \
 
 - **API Base URL**: `https://localhost:7001` or `http://localhost:5001`
 - **BFF Base URL**: `https://localhost:7245` or `http://localhost:5245`
-- **Swagger UI**: `https://localhost:7001/swagger`
-- **Health Check**: `https://localhost:7001/health`
+- **React Frontend**: `https://localhost:7245` (served by BFF)
+- **Swagger UI**: `https://localhost:7001/swagger` (API) and `https://localhost:7245/swagger` (BFF)
+- **Health Check**: `https://localhost:7001/health` and `https://localhost:7245/health`
 - **Aspire Dashboard**: `https://localhost:15888` (when running with Aspire Host)
 
 ## API Endpoints
 
-### MCP Tools
+### MCP API (Direct Access)
 
 - `GET /api/mcp/tools` - Get all available MCP tools
 - `POST /api/mcp/tools/{toolName}/execute` - Execute a specific tool
-
-Example tools:
-- `echo` - Echoes back a message
-- `time` - Returns current time information
-- `calculate` - Performs basic arithmetic calculations
-
-### MCP Resources
-
 - `GET /api/mcp/resources` - Get all available MCP resources
 - `GET /api/mcp/resources/content?uri={uri}` - Get content of a specific resource
 
+### BFF API (Frontend Integration)
+
+- `GET /api/assets` - Get sample assets (demo data)
+- `GET /api/mcp/tools` - Proxy to MCP API tools (requires API key)
+- `POST /api/mcp/tools/{toolName}/execute` - Proxy to MCP API tool execution (requires API key)
+- `GET /api/mcp/resources` - Proxy to MCP API resources (requires API key)
+- `GET /api/mcp/resources/content?uri={uri}` - Proxy to MCP API resource content (requires API key)
+
+**Note**: BFF MCP endpoints require the `X-API-Key` header with value `dev-api-key-123` for authentication.
+
+### Frontend Features
+
+The React frontend provides:
+- **Assets Display**: Shows sample assets from the BFF
+- **MCP Tools**: Lists and displays available MCP tools with their descriptions
+- **MCP Resources**: Shows available MCP resources with their metadata
+- **Error Handling**: Graceful handling of API errors and connection issues
+- **Authentication**: Automatic API key inclusion for MCP endpoints
+
 ## Usage Examples
 
-### Execute Echo Tool
+### Direct MCP API Access
+
+#### Execute Echo Tool
 
 ```bash
 curl -X POST "https://localhost:7001/api/mcp/tools/echo/execute" \
@@ -117,7 +134,7 @@ curl -X POST "https://localhost:7001/api/mcp/tools/echo/execute" \
   -d '{"message": "Hello, MCP!"}'
 ```
 
-### Get Current Time
+#### Get Current Time
 
 ```bash
 curl -X POST "https://localhost:7001/api/mcp/tools/time/execute" \
@@ -125,13 +142,43 @@ curl -X POST "https://localhost:7001/api/mcp/tools/time/execute" \
   -d '{}'
 ```
 
-### Perform Calculation
+#### Perform Calculation
 
 ```bash
 curl -X POST "https://localhost:7001/api/mcp/tools/calculate/execute" \
   -H "Content-Type: application/json" \
   -d '{"expression": "2+2"}'
 ```
+
+### BFF API Access (Frontend Integration)
+
+#### Get MCP Tools (with authentication)
+
+```bash
+curl -X GET "https://localhost:7245/api/mcp/tools" \
+  -H "X-API-Key: dev-api-key-123"
+```
+
+#### Execute Tool via BFF
+
+```bash
+curl -X POST "https://localhost:7245/api/mcp/tools/echo/execute" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: dev-api-key-123" \
+  -d '{"message": "Hello via BFF!"}'
+```
+
+#### Frontend Access
+
+Simply navigate to `https://localhost:7245` in your browser to access the React frontend, which automatically:
+- Fetches and displays assets, MCP tools, and resources
+- Handles authentication with proper API keys
+- Provides error handling for failed API calls
+
+Example tools available:
+- `echo` - Echoes back a message
+- `time` - Returns current time information
+- `calculate` - Performs basic arithmetic calculations
 
 ## Docker Support
 
@@ -196,6 +243,30 @@ The application uses standard .NET configuration. Key settings can be configured
 - Environment variables
 - Command line arguments
 - Azure Key Vault (in production)
+
+### BFF Configuration
+
+The Backend-for-Frontend service has additional configuration for MCP API integration:
+
+```json
+{
+  "McpApi": {
+    "BaseUrl": "https://localhost:7001",
+    "ApiKey": "dev-api-key-123"
+  }
+}
+```
+
+Configuration options:
+- `McpApi:BaseUrl` - URL of the MCP API service
+- `McpApi:ApiKey` - API key for authenticating BFF requests to MCP endpoints
+
+### Frontend Configuration
+
+The React frontend automatically uses the configured API key for MCP endpoint authentication. In production, consider:
+- Storing API keys securely (environment variables, key vault)
+- Using different API keys per environment
+- Implementing proper user authentication instead of shared API keys
 
 ## Deployment
 
